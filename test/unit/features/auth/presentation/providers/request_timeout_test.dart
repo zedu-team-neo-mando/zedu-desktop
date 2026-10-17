@@ -121,7 +121,7 @@ void main() {
         container.read(authNotifierProvider).status,
         AuthStatus.unauthenticated,
       );
-      // Existing session cleanup is unchanged by the timeout configuration fix.
+      // Preserve staging's existing session cleanup on a failed restore.
       expect(storage.token, isNull);
     },
   );
