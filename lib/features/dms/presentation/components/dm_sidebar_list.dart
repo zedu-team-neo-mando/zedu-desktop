@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -7,6 +9,7 @@ class DmSidebarList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.colors;
+    final query = ref.watch(dmSearchQueryProvider);
 
     return Container(
       width: 320,
@@ -29,24 +32,7 @@ class DmSidebarList extends ConsumerWidget {
                         color: colors.onPrimary.withValues(alpha: 0.68),
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        const SizedBox(width: 8),
-                        Icon(
-                          Icons.search,
-                          color: colors.onPrimary.withValues(alpha: 0.9),
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Find a Conversation',
-                          style: TextStyle(
-                            color: colors.onPrimary.withValues(alpha: 0.9),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
+                    child: const _DmSearchField(),
                   ),
                 ),
               ],
@@ -56,6 +42,7 @@ class DmSidebarList extends ConsumerWidget {
             child: ref
                 .watch(dmListProvider)
                 .when(
+                  skipLoadingOnReload: true,
                   loading: () => const Center(
                     child: CircularProgressIndicator(color: Colors.white),
                   ),
@@ -69,7 +56,7 @@ class DmSidebarList extends ConsumerWidget {
                     if (conversations.isEmpty) {
                       return Center(
                         child: Text(
-                          'No recent chats',
+                          query.isEmpty ? 'No recent chats' : 'No matches',
                           style: TextStyle(
                             color: colors.onPrimary.withValues(alpha: 0.5),
                           ),
@@ -100,6 +87,79 @@ class DmSidebarList extends ConsumerWidget {
                 ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DmSearchField extends ConsumerStatefulWidget {
+  const _DmSearchField();
+
+  @override
+  ConsumerState<_DmSearchField> createState() => _DmSearchFieldState();
+}
+
+class _DmSearchFieldState extends ConsumerState<_DmSearchField> {
+  static const _debounceDuration = Duration(milliseconds: 300);
+
+  late final TextEditingController _controller;
+  Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: ref.read(dmSearchQueryProvider));
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(_debounceDuration, () {
+      ref.read(dmSearchQueryProvider.notifier).set(value.trim());
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Material(
+      type: MaterialType.transparency,
+      child: TextField(
+        controller: _controller,
+        onChanged: _onChanged,
+        cursorColor: colors.onPrimary,
+        style: TextStyle(color: colors.onPrimary, fontSize: 12),
+        decoration: InputDecoration(
+          isDense: true,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          hintText: 'Find a Conversation',
+          hintStyle: TextStyle(
+            color: colors.onPrimary.withValues(alpha: 0.9),
+            fontSize: 12,
+          ),
+          prefixIcon: Icon(
+            Icons.search,
+            color: colors.onPrimary.withValues(alpha: 0.9),
+            size: 16,
+          ),
+          prefixIconConstraints: const BoxConstraints(
+            minWidth: 24,
+            minHeight: 0,
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: 8,
+          ),
+        ),
       ),
     );
   }
