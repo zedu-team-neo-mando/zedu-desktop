@@ -8,12 +8,18 @@ class PersonalProfilePanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.colors;
     final profileState = ref.watch(userProfileNotifierProvider);
-    final account = profileState.account ?? ProfileAccount.empty();
+    final authenticatedUser = ref.watch(authNotifierProvider).user;
+    final account = accountForAuthenticatedUser(
+      profileState.account ?? ProfileAccount.empty(),
+      authenticatedUser,
+    );
     final menuState = ref.watch(userMenuStateProvider);
 
     final displayName = account.displayName.isNotEmpty
         ? account.displayName
-        : account.name;
+        : (account.name.isNotEmpty
+              ? account.name
+              : (authenticatedUser?.username ?? ''));
     final roleTitle = account.title.isNotEmpty ? account.title : 'Member';
 
     return Container(

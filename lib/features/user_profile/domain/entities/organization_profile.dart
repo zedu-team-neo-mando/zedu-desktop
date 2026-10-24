@@ -8,7 +8,7 @@ class OrganizationProfile {
 
   factory OrganizationProfile.empty() => const OrganizationProfile(
     id: '019700db-4e22-7f90-a20e-f9116291ef24',
-    name: 'Anonymous user',
+    name: '',
     natureOfBusiness: 'Design agency',
     country: 'Nigeria',
   );

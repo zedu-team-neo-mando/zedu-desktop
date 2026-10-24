@@ -9,9 +9,13 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
   @override
   UserProfileState build() {
     _repository = ref.read(userProfileRepositoryProvider);
+    final user = ref.read(authNotifierProvider).user;
+    final initialAccount = user != null
+        ? accountForAuthenticatedUser(ProfileAccount.empty(), user)
+        : null;
     // Defer loading until Riverpod has installed this notifier's initial state.
     Future<void>.microtask(load);
-    return const UserProfileState(isLoading: true);
+    return UserProfileState(isLoading: true, account: initialAccount);
   }
 
   void selectSection(UserProfileSection section) {
@@ -483,8 +487,16 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
       }
     }
 
+    final loadedAccount = _valueOrNull(accountResult);
+    final user = ref.read(authNotifierProvider).user;
+    final resolvedAccount = loadedAccount != null
+        ? accountForAuthenticatedUser(loadedAccount, user)
+        : (user != null
+              ? accountForAuthenticatedUser(ProfileAccount.empty(), user)
+              : null);
+
     state = state.copyWith(
-      account: _valueOrNull(accountResult),
+      account: resolvedAccount,
       notifications: _valueOrNull(notificationResult),
       securitySessions: _valueOrNull(securityResult) ?? const [],
       organization: _valueOrNull(organizationResult),

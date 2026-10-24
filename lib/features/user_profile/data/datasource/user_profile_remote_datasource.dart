@@ -457,11 +457,7 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
   }
 }
 
-const _account = {
-  'name': 'Anonymous user',
-  'email': 'anonymoususer@email.com',
-  'timezone': 'Africa/Lagos',
-};
+const _account = {'name': '', 'email': '', 'timezone': 'Africa/Lagos'};
 
 const _notifications = {
   'mode': 'allMessages',
@@ -472,7 +468,7 @@ const _notifications = {
 };
 
 const _organization = {
-  'name': 'Anonymous user',
+  'name': '',
   'nature_of_business': 'Design agency',
   'country': 'Nigeria',
 };

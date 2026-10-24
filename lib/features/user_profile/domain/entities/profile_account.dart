@@ -1,3 +1,5 @@
+import 'package:zedu/features/auth/domain/entities/user.dart';
+
 class ProfileAccount {
   const ProfileAccount({
     required this.name,
@@ -12,11 +14,8 @@ class ProfileAccount {
     this.country = '',
   });
 
-  factory ProfileAccount.empty() => const ProfileAccount(
-    name: 'Anonymous user',
-    email: 'anonymoususer@email.com',
-    timezone: 'Africa/Lagos',
-  );
+  factory ProfileAccount.empty() =>
+      const ProfileAccount(name: '', email: '', timezone: 'Africa/Lagos');
 
   final String name;
   final String email;
@@ -61,4 +60,34 @@ class ProfileAccount {
       country: country ?? this.country,
     );
   }
+}
+
+ProfileAccount accountForAuthenticatedUser(
+  ProfileAccount account,
+  User? authenticatedUser,
+) {
+  if (authenticatedUser == null) return account;
+
+  final authenticatedName = authenticatedUser.fullname.trim().isNotEmpty
+      ? authenticatedUser.fullname.trim()
+      : authenticatedUser.username;
+  final name = account.name.trim();
+  final email = account.email.trim();
+
+  return account.copyWith(
+    name: name.isEmpty || name.toLowerCase() == 'anonymous user'
+        ? authenticatedName
+        : name,
+    email: email.isEmpty || email.toLowerCase() == 'anonymoususer@email.com'
+        ? authenticatedUser.email
+        : email,
+    username:
+        account.username.trim().isEmpty ||
+            account.username.toLowerCase() == 'anonymoususer'
+        ? authenticatedUser.username
+        : account.username,
+    avatarUrl: account.avatarUrl?.trim().isNotEmpty == true
+        ? account.avatarUrl
+        : authenticatedUser.avatarUrl,
+  );
 }
