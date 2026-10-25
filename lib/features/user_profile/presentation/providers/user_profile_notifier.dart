@@ -4,14 +4,28 @@ import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
 class UserProfileNotifier extends Notifier<UserProfileState> {
-  late final UserProfileRepository _repository;
+  UserProfileRepository get _repository =>
+      ref.read(userProfileRepositoryProvider);
+  String? _boundUserId;
 
   @override
   UserProfileState build() {
-    _repository = ref.read(userProfileRepositoryProvider);
+    final authState = ref.watch(authNotifierProvider);
+    final user = authState.user;
+
+    if (user == null || authState.status != AuthStatus.authenticated) {
+      _boundUserId = null;
+      return const UserProfileState();
+    }
+
+    _boundUserId = user.id;
+    final initialAccount = accountForAuthenticatedUser(
+      ProfileAccount.empty(),
+      user,
+    );
     // Defer loading until Riverpod has installed this notifier's initial state.
     Future<void>.microtask(load);
-    return const UserProfileState(isLoading: true);
+    return UserProfileState(isLoading: true, account: initialAccount);
   }
 
   void selectSection(UserProfileSection section) {
@@ -31,8 +45,9 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
     final result = await _repository.updateAccount(account);
     switch (result) {
       case Success<ProfileAccount>():
+        final user = ref.read(authNotifierProvider).user;
         state = state.copyWith(
-          account: result.value,
+          account: accountForAuthenticatedUser(result.value, user),
           isSaving: false,
           successMessage: 'Account information saved successfully.',
         );
@@ -432,6 +447,7 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
   }
 
   Future<void> load() async {
+    final boundUserId = _boundUserId;
     state = state.copyWith(isLoading: true, clearError: true);
     final orgId = ref.read(workspaceProvider).selectedWorkspace?.id;
     final results = await Future.wait([
@@ -443,6 +459,8 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
       _repository.getRolesAndPermissions(),
       _repository.getBillingInfo(),
     ]);
+
+    if (!ref.mounted) return;
 
     final accountResult = results[0] as Result<ProfileAccount>;
     final notificationResult = results[1] as Result<NotificationPreferences>;
@@ -460,6 +478,7 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
     if (orgId != null) {
       final storage = locator<SecureStorageService>();
       final data = await storage.readData('mock_team_members_$orgId');
+      if (!ref.mounted) return;
       if (data != null) {
         try {
           final List<dynamic> decoded = jsonDecode(data) as List<dynamic>;
@@ -483,8 +502,27 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
       }
     }
 
+    final authState = ref.read(authNotifierProvider);
+    final currentUserId = authState.user?.id;
+    if (authState.status != AuthStatus.authenticated ||
+        currentUserId == null ||
+        boundUserId == null ||
+        currentUserId != boundUserId ||
+        _boundUserId != boundUserId) {
+      // User signed out or switched while load was in flight; discard stale results.
+      return;
+    }
+
+    final loadedAccount = _valueOrNull(accountResult);
+    final user = authState.user;
+    final resolvedAccount = loadedAccount != null
+        ? accountForAuthenticatedUser(loadedAccount, user)
+        : (user != null
+              ? accountForAuthenticatedUser(ProfileAccount.empty(), user)
+              : null);
+
     state = state.copyWith(
-      account: _valueOrNull(accountResult),
+      account: resolvedAccount,
       notifications: _valueOrNull(notificationResult),
       securitySessions: _valueOrNull(securityResult) ?? const [],
       organization: _valueOrNull(organizationResult),

@@ -11,8 +11,8 @@ class ProfileAccountModel extends ProfileAccount {
 
   factory ProfileAccountModel.fromJson(Map<String, dynamic> json) {
     return ProfileAccountModel(
-      name: json['name'] as String? ?? 'Anonymous user',
-      email: json['email'] as String? ?? 'anonymoususer@email.com',
+      name: json['name'] as String? ?? '',
+      email: json['email'] as String? ?? '',
       timezone: json['timezone'] as String? ?? 'Africa/Lagos',
       avatarUrl: json['avatar_url'] as String?,
       username: json['username'] as String? ?? '',
@@ -74,7 +74,7 @@ class OrganizationProfileModel extends OrganizationProfile {
   factory OrganizationProfileModel.fromJson(Map<String, dynamic> json) {
     return OrganizationProfileModel(
       id: json['id'] as String? ?? '019700db-4e22-7f90-a20e-f9116291ef24',
-      name: json['name'] as String? ?? 'Anonymous user',
+      name: json['name'] as String? ?? '',
       natureOfBusiness:
           json['nature_of_business'] as String? ?? 'Design agency',
       country: json['country'] as String? ?? 'Nigeria',

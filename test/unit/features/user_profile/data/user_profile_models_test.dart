@@ -38,6 +38,25 @@ void main() {
 
       expect(account.username, '');
     });
+
+    test('defaults name, email, and username to empty strings when absent', () {
+      final account = ProfileAccountModel.fromJson(const {});
+
+      expect(account.name, '');
+      expect(account.email, '');
+      expect(account.username, '');
+    });
+
+    test(
+      'ProfileAccount.empty() returns empty fields without placeholders',
+      () {
+        final account = ProfileAccount.empty();
+
+        expect(account.name, '');
+        expect(account.email, '');
+        expect(account.username, '');
+      },
+    );
   });
 
   group('NotificationPreferencesModel', () {

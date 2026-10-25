@@ -50,37 +50,6 @@ class UserProfileView extends ConsumerWidget {
   }
 }
 
-@visibleForTesting
-ProfileAccount accountForAuthenticatedUser(
-  ProfileAccount account,
-  User? authenticatedUser,
-) {
-  if (authenticatedUser == null) return account;
-
-  final authenticatedName = authenticatedUser.fullname.trim().isNotEmpty
-      ? authenticatedUser.fullname.trim()
-      : authenticatedUser.username;
-  final name = account.name.trim();
-  final email = account.email.trim();
-
-  return account.copyWith(
-    name: name.isEmpty || name.toLowerCase() == 'anonymous user'
-        ? authenticatedName
-        : name,
-    email: email.isEmpty || email.toLowerCase() == 'anonymoususer@email.com'
-        ? authenticatedUser.email
-        : email,
-    username:
-        account.username.trim().isEmpty ||
-            account.username.toLowerCase() == 'anonymoususer'
-        ? authenticatedUser.username
-        : account.username,
-    avatarUrl: account.avatarUrl?.trim().isNotEmpty == true
-        ? account.avatarUrl
-        : authenticatedUser.avatarUrl,
-  );
-}
-
 class _ProfileContent extends StatelessWidget {
   const _ProfileContent({
     required this.state,
