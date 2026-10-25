@@ -68,26 +68,56 @@ ProfileAccount accountForAuthenticatedUser(
 ) {
   if (authenticatedUser == null) return account;
 
-  final authenticatedName = authenticatedUser.fullname.trim().isNotEmpty
+  final authenticatedFullName = authenticatedUser.fullname.trim().isNotEmpty
       ? authenticatedUser.fullname.trim()
-      : authenticatedUser.username;
-  final name = account.name.trim();
-  final email = account.email.trim();
+      : authenticatedUser.username.trim();
+  final authenticatedEmail = authenticatedUser.email.trim();
+  final authenticatedUsername = authenticatedUser.username.trim();
 
-  return account.copyWith(
-    name: name.isEmpty || name.toLowerCase() == 'anonymous user'
-        ? authenticatedName
-        : name,
-    email: email.isEmpty || email.toLowerCase() == 'anonymoususer@email.com'
-        ? authenticatedUser.email
-        : email,
-    username:
-        account.username.trim().isEmpty ||
-            account.username.toLowerCase() == 'anonymoususer'
-        ? authenticatedUser.username
-        : account.username,
-    avatarUrl: account.avatarUrl?.trim().isNotEmpty == true
-        ? account.avatarUrl
-        : authenticatedUser.avatarUrl,
+  // If the account belongs to a different email, do not retain previous user's state.
+  final isSameUserAccount =
+      account.email.trim().isEmpty ||
+      account.email.trim().toLowerCase() == authenticatedEmail.toLowerCase();
+
+  final baseAccount = isSameUserAccount ? account : ProfileAccount.empty();
+  final accountName = baseAccount.name.trim();
+
+  // If accountName is a valid non-placeholder and not simply the raw username, keep it;
+  // otherwise prioritize the authenticated user's full name.
+  final isAccountNameValidFullName =
+      accountName.isNotEmpty &&
+      accountName.toLowerCase() != 'anonymous user' &&
+      accountName.toLowerCase() != authenticatedUsername.toLowerCase();
+
+  final resolvedName = isAccountNameValidFullName
+      ? accountName
+      : (authenticatedFullName.isNotEmpty
+            ? authenticatedFullName
+            : authenticatedUsername);
+
+  final resolvedEmail = authenticatedEmail.isNotEmpty
+      ? authenticatedEmail
+      : baseAccount.email.trim();
+
+  final resolvedUsername = authenticatedUsername.isNotEmpty
+      ? authenticatedUsername
+      : baseAccount.username.trim();
+
+  final avatar = authenticatedUser.avatarUrl.trim().isNotEmpty
+      ? authenticatedUser.avatarUrl.trim()
+      : (baseAccount.avatarUrl?.trim().isNotEmpty == true
+            ? baseAccount.avatarUrl!.trim()
+            : null);
+
+  final resolvedPhone = authenticatedUser.phone.trim().isNotEmpty
+      ? authenticatedUser.phone.trim()
+      : baseAccount.phoneNumber.trim();
+
+  return baseAccount.copyWith(
+    name: resolvedName,
+    email: resolvedEmail,
+    username: resolvedUsername,
+    avatarUrl: avatar,
+    phoneNumber: resolvedPhone,
   );
 }

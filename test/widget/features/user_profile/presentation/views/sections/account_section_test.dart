@@ -3,10 +3,14 @@ import 'package:zedu/features/features.dart';
 
 import '../../../../../../helpers/helpers.dart';
 
-ProfileAccount buildAccount({String username = ''}) {
+ProfileAccount buildAccount({
+  String name = 'Ada Okafor',
+  String email = 'ada@zedu.chat',
+  String username = '',
+}) {
   return ProfileAccount(
-    name: 'Ada Okafor',
-    email: 'ada@zedu.chat',
+    name: name,
+    email: email,
     timezone: 'Africa/Lagos',
     username: username,
   );
@@ -45,4 +49,51 @@ void main() {
 
     expect(find.text('@adaokafor'), findsOneWidget);
   });
+
+  testWidgets('displays the authenticated user complete full name and email', (
+    tester,
+  ) async {
+    final account = buildAccount(
+      name: 'Pauline Banye',
+      email: 'pauline@zedu.chat',
+      username: 'pauline',
+    );
+
+    await tester.pumpWidget(buildSectionUnderTest(account));
+
+    expect(find.text('Pauline Banye'), findsOneWidget);
+    expect(find.text('pauline@zedu.chat'), findsOneWidget);
+  });
+
+  testWidgets(
+    'updates displayed info when switching from User A to User B without restart',
+    (tester) async {
+      final userAAccount = buildAccount(
+        name: 'Pauline Banye',
+        email: 'pauline@zedu.chat',
+        username: 'pauline',
+      );
+      final userBAccount = buildAccount(
+        name: 'Maureen Chidera',
+        email: 'maureen@zedu.chat',
+        username: 'maureen',
+      );
+
+      // Render User A
+      await tester.pumpWidget(buildSectionUnderTest(userAAccount));
+      expect(find.text('Pauline Banye'), findsOneWidget);
+      expect(find.text('pauline@zedu.chat'), findsOneWidget);
+
+      // Switch to User B
+      await tester.pumpWidget(buildSectionUnderTest(userBAccount));
+      await tester.pumpAndSettle();
+
+      // Verify User B is displayed and User A is no longer displayed
+      expect(find.text('Maureen Chidera'), findsOneWidget);
+      expect(find.text('maureen@zedu.chat'), findsOneWidget);
+
+      expect(find.text('Pauline Banye'), findsNothing);
+      expect(find.text('pauline@zedu.chat'), findsNothing);
+    },
+  );
 }
