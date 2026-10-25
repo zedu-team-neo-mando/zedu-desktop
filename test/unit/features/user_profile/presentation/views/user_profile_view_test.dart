@@ -124,28 +124,29 @@ void main() {
         },
       );
 
-      test(
-        'derives full name from first and last name',
-        () {
-          final sessionUser = buildSessionUser(
-            firstName: 'Pauline',
-            lastName: 'Banye',
-            username: 'pauline',
-            email: 'pauline@zedu.chat',
-          );
-          final account = accountForAuthenticatedUser(
-            buildAccount(name: '', email: 'pauline@zedu.chat'),
-            sessionUser,
-          );
+      test('derives full name from first and last name', () {
+        final sessionUser = buildSessionUser(
+          firstName: 'Pauline',
+          lastName: 'Banye',
+          username: 'pauline',
+          email: 'pauline@zedu.chat',
+        );
+        final account = accountForAuthenticatedUser(
+          buildAccount(name: '', email: 'pauline@zedu.chat'),
+          sessionUser,
+        );
 
-          expect(account.name, 'Pauline Banye');
-        },
-      );
+        expect(account.name, 'Pauline Banye');
+      });
 
       test('retains an updated real full name for the same user account', () {
         final account = accountForAuthenticatedUser(
           buildAccount(name: 'Ada N. Okafor', email: 'ada@zedu.chat'),
-          buildSessionUser(email: 'ada@zedu.chat', firstName: 'Ada', lastName: 'Okafor'),
+          buildSessionUser(
+            email: 'ada@zedu.chat',
+            firstName: 'Ada',
+            lastName: 'Okafor',
+          ),
         );
 
         expect(account.name, 'Ada N. Okafor');
