@@ -1,4 +1,5 @@
 export 'account_section.dart';
+export 'appearance_section.dart';
 export 'billing_section.dart';
 export 'notifications_section.dart';
 export 'organization_section.dart';

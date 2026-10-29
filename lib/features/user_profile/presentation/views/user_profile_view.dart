@@ -114,6 +114,7 @@ class _ProfileContent extends StatelessWidget {
               onSave: notifier.updateNotificationPreferences,
               onRevert: notifier.revertNotificationPreferences,
             ),
+            UserProfileSection.appearance => const AppearanceSection(),
             UserProfileSection.security => SecuritySection(
               sessions: state.securitySessions,
               isSaving: state.isSaving,

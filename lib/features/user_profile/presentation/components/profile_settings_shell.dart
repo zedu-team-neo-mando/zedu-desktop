@@ -26,7 +26,7 @@ class ProfileSettingsShell extends ConsumerWidget {
     }
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.colors.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -179,6 +179,12 @@ class _SettingsNavigation extends StatelessWidget {
             label: 'Notifications',
             selected: selectedSection == UserProfileSection.notifications,
             onTap: () => onSectionSelected(UserProfileSection.notifications),
+          ),
+          _NavigationTile(
+            icon: Icons.palette_outlined,
+            label: 'Appearance',
+            selected: selectedSection == UserProfileSection.appearance,
+            onTap: () => onSectionSelected(UserProfileSection.appearance),
           ),
           _NavigationTile(
             icon: Icons.lock_outline,
