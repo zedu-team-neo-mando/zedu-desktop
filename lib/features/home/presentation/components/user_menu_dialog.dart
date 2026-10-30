@@ -256,7 +256,7 @@ class UserMenuDialog extends ConsumerWidget {
               // ── Sign out ───────────────────────────────────────────────────
               _MenuItemButton(
                 icon: Icons.logout_rounded,
-                label: 'Sign out of $signOutTarget',
+                label: 'Sign out',
                 isError: true,
                 onTap: () async {
                   Navigator.pop(context);
