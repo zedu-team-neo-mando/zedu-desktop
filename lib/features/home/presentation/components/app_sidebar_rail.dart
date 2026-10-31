@@ -1,6 +1,13 @@
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
+/// Sums the unread counts across all DM conversations.
+int totalUnreadDmCount(Iterable<int> unreadCounts) =>
+    unreadCounts.fold<int>(0, (sum, count) => sum + count);
+
+/// Text shown in the sidebar unread badge, capped at 99+.
+String unreadBadgeLabel(int count) => count > 99 ? '99+' : '$count';
+
 class AppSidebarRail extends ConsumerStatefulWidget {
   const AppSidebarRail({
     super.key,
@@ -57,6 +64,16 @@ class _AppSidebarRailState extends ConsumerState<AppSidebarRail> {
     ValueChanged<HomeSidebarType> select,
   ) {
     final colors = context.colors;
+
+    final totalUnreadDms = ref
+        .watch(dmListProvider)
+        .maybeWhen(
+          data: (conversations) => totalUnreadDmCount(
+            conversations.map((conversation) => conversation.unreadCount),
+          ),
+          orElse: () => 0,
+        );
+
     return Container(
       width: AppSidebarRail.width,
       decoration: BoxDecoration(
@@ -80,6 +97,7 @@ class _AppSidebarRailState extends ConsumerState<AppSidebarRail> {
             popoutType: HomeSidebarType.dms,
             positionKey: dmsTargetKey,
             isActive: activeType == HomeSidebarType.dms,
+            badgeCount: totalUnreadDms,
             onTap: () => select(HomeSidebarType.dms),
           ),
           _RailNavItem(
@@ -174,6 +192,7 @@ class _RailNavItem extends StatefulWidget {
     this.popoutType,
     this.isActive = false,
     this.positionKey,
+    this.badgeCount = 0,
     this.onTap,
   });
 
@@ -182,6 +201,7 @@ class _RailNavItem extends StatefulWidget {
   final HomeSidebarType? popoutType;
   final bool isActive;
   final GlobalKey? positionKey;
+  final int badgeCount;
   final VoidCallback? onTap;
 
   @override
@@ -210,17 +230,32 @@ class _RailNavItemState extends State<_RailNavItem> {
             MouseRegion(
               onEnter: (_) => setState(() => _hovered = true),
               onExit: (_) => setState(() => _hovered = false),
-              child: Container(
-                key: widget.positionKey,
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: (widget.isActive || _hovered)
-                      ? colors.primary.withValues(alpha: 0.95)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(7),
-                ),
-                child: Icon(widget.icon, color: colors.onPrimary, size: 18),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    key: widget.positionKey,
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: (widget.isActive || _hovered)
+                          ? colors.primary.withValues(alpha: 0.95)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: Icon(
+                      widget.icon,
+                      color: colors.onPrimary,
+                      size: 18,
+                    ),
+                  ),
+                  if (widget.badgeCount > 0)
+                    Positioned(
+                      right: -4,
+                      top: -4,
+                      child: _UnreadBadge(count: widget.badgeCount),
+                    ),
+                ],
               ),
             ),
             const SizedBox(height: 4),
@@ -233,6 +268,35 @@ class _RailNavItemState extends State<_RailNavItem> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _UnreadBadge extends StatelessWidget {
+  const _UnreadBadge({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Container(
+      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: colors.error,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        unreadBadgeLabel(count),
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
