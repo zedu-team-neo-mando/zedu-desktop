@@ -26,9 +26,181 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
     return '@${parts.first}_${parts.last}';
   }
 
+  Future<void> _handleMenuAction(String action) async {
+    final conversation = widget.conversation;
+    switch (action) {
+      case 'view_profile':
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(conversation.displayName),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (conversation.participantEmail?.isNotEmpty == true)
+                  Text(conversation.participantEmail!),
+                Text('User ID: ${conversation.participantId}'),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+      case 'mute_notifications':
+        final settings = ref.read(notificationSettingsProvider);
+        final notifier = ref.read(notificationSettingsProvider.notifier);
+        if (settings.isMuted(conversation.participantId)) {
+          notifier.unmuteParticipant(conversation.participantId);
+        } else {
+          notifier.muteParticipant(conversation.participantId);
+        }
+      case 'pin_conversation':
+        ref
+            .read(dmConversationActionsProvider.notifier)
+            .togglePinned(conversation.channelId);
+      case 'search_in_conversation':
+        await _showConversationSearch();
+      case 'view_files':
+        await _showConversationFiles();
+      case 'clear_history':
+        final confirmed = await _confirmConversationAction(
+          title: 'Clear history?',
+          message:
+              'Clear the loaded message history for ${conversation.displayName}?',
+          confirmLabel: 'Clear history',
+        );
+        if (confirmed && mounted) {
+          ref
+              .read(chatHistoryProvider(conversation.channelId))
+              .clearLocalHistory();
+          _showActionNotice('Loaded history cleared locally.');
+        }
+      case 'delete_conversation':
+        final confirmed = await _confirmConversationAction(
+          title: 'Delete conversation?',
+          message:
+              'This removes the conversation from your DM list. ${conversation.displayName} can still see it.',
+          confirmLabel: 'Delete conversation',
+          destructive: true,
+        );
+        if (!confirmed || !mounted) return;
+        final deleted = await ref
+            .read(dmConversationActionsProvider.notifier)
+            .delete(conversation.channelId);
+        if (!deleted && mounted) {
+          _showActionNotice("Couldn't delete the conversation. Try again.");
+        }
+    }
+  }
+
+  Future<bool> _confirmConversationAction({
+    required String title,
+    required String message,
+    required String confirmLabel,
+    bool destructive = false,
+  }) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(title),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: destructive
+                    ? TextButton.styleFrom(
+                        foregroundColor: context.colors.error,
+                      )
+                    : null,
+                child: Text(confirmLabel),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Future<void> _showConversationSearch() async {
+    final history = ref.read(
+      chatHistoryProvider(widget.conversation.channelId),
+    );
+    await showDialog<void>(
+      context: context,
+      builder: (context) => _ConversationSearchDialog(
+        displayName: widget.conversation.displayName,
+        messages: history.messages,
+      ),
+    );
+  }
+
+  Future<void> _showConversationFiles() async {
+    final history = ref.read(
+      chatHistoryProvider(widget.conversation.channelId),
+    );
+    final files = history.messages
+        .expand((message) => (message['media'] as List<dynamic>?) ?? const [])
+        .toList();
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('${widget.conversation.displayName} files'),
+        content: SizedBox(
+          width: 420,
+          child: files.isEmpty
+              ? const Text('No files in the loaded conversation history.')
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: files.length,
+                  itemBuilder: (context, index) {
+                    final file = files[index] as Map;
+                    return ListTile(
+                      leading: const Icon(Icons.insert_drive_file_outlined),
+                      title: Text(
+                        file['file_name']?.toString() ?? 'Attachment',
+                      ),
+                      subtitle: Text(file['file_type']?.toString() ?? ''),
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showActionNotice(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final isMuted = ref.watch(
+      notificationSettingsProvider.select(
+        (settings) => settings.isMuted(widget.conversation.participantId),
+      ),
+    );
+    final isPinned = ref.watch(
+      dmConversationActionsProvider.select(
+        (actions) => actions.pinnedIds.contains(widget.conversation.channelId),
+      ),
+    );
 
     return DropTarget(
       onDragDone: (detail) {
@@ -47,7 +219,12 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
           children: [
             Column(
               children: [
-                _DmChatHeader(conversation: widget.conversation),
+                _DmChatHeader(
+                  conversation: widget.conversation,
+                  isMuted: isMuted,
+                  isPinned: isPinned,
+                  onMenuAction: _handleMenuAction,
+                ),
                 Expanded(
                   child: Consumer(
                     builder: (context, ref, child) {
@@ -90,6 +267,9 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                                     message: msg,
                                     conversation: widget.conversation,
                                     channelId: widget.conversation.channelId,
+                                    onEdit: (id, text) => _composerKey
+                                        .currentState
+                                        ?.enterEditMode(id, text),
                                   );
                                 }, childCount: messages.length),
                               ),
@@ -277,10 +457,91 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
   }
 }
 
+class _ConversationSearchDialog extends StatefulWidget {
+  final String displayName;
+  final List<Map<String, dynamic>> messages;
+
+  const _ConversationSearchDialog({
+    required this.displayName,
+    required this.messages,
+  });
+
+  @override
+  State<_ConversationSearchDialog> createState() =>
+      _ConversationSearchDialogState();
+}
+
+class _ConversationSearchDialogState extends State<_ConversationSearchDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final query = _controller.text.toLowerCase();
+    final results = widget.messages.where(
+      (message) =>
+          (message['content']?.toString() ?? '').toLowerCase().contains(query),
+    );
+    return AlertDialog(
+      title: Text('Search ${widget.displayName}'),
+      content: SizedBox(
+        width: 420,
+        height: 360,
+        child: Column(
+          mainAxisSize: MainAxisSize.max,
+          children: [
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              decoration: const InputDecoration(hintText: 'Search messages'),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 12),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: query.isEmpty
+                    ? const [Text('Enter a search term')]
+                    : results
+                          .map(
+                            (message) => ListTile(
+                              dense: true,
+                              title: Text(message['content']?.toString() ?? ''),
+                            ),
+                          )
+                          .toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+      ],
+    );
+  }
+}
+
 class _DmChatHeader extends StatelessWidget {
   final DmConversation conversation;
+  final bool isMuted;
+  final bool isPinned;
+  final ValueChanged<String> onMenuAction;
 
-  const _DmChatHeader({required this.conversation});
+  const _DmChatHeader({
+    required this.conversation,
+    required this.isMuted,
+    required this.isPinned,
+    required this.onMenuAction,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -326,37 +587,6 @@ class _DmChatHeader extends StatelessWidget {
           const Spacer(),
           Consumer(
             builder: (context, ref, child) {
-              return IconButton(
-                icon: const Icon(Icons.notifications_active_outlined),
-                tooltip: 'Test Notification (Delayed 5s)',
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Notification will fire in 5 seconds. Minimize the app now!',
-                      ),
-                    ),
-                  );
-                  Future.delayed(const Duration(seconds: 5), () {
-                    ref
-                        .read(notificationServiceProvider)
-                        .handleIncomingMessage(
-                          {
-                            'user_id': conversation.participantId,
-                            'content': 'Hello! This is a test DM notification.',
-                          },
-                          conversation.channelId,
-                          conversation.displayName,
-                          forceShow: true,
-                        );
-                  });
-                },
-              );
-            },
-          ),
-          const SizedBox(width: 8),
-          Consumer(
-            builder: (context, ref, child) {
               return InkWell(
                 onTap: () {
                   ref
@@ -386,7 +616,64 @@ class _DmChatHeader extends StatelessWidget {
             },
           ),
           const SizedBox(width: 12),
-          Icon(Icons.more_vert, color: colors.textHint),
+          PopupMenuButton<String>(
+            tooltip: 'More options',
+            position: PopupMenuPosition.under,
+            icon: Icon(Icons.more_vert, color: colors.textHint),
+            onSelected: onMenuAction,
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'view_profile',
+                child: Text(
+                  'View profile',
+                  style: TextStyle(color: colors.textPrimary),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'mute_notifications',
+                child: Text(
+                  isMuted ? 'Unmute notifications' : 'Mute notifications',
+                  style: TextStyle(color: colors.textPrimary),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'pin_conversation',
+                child: Text(
+                  isPinned ? 'Unpin conversation' : 'Pin conversation',
+                  style: TextStyle(color: colors.textPrimary),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'search_in_conversation',
+                child: Text(
+                  'Search in conversation',
+                  style: TextStyle(color: colors.textPrimary),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'view_files',
+                child: Text(
+                  'View files',
+                  style: TextStyle(color: colors.textPrimary),
+                ),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                value: 'clear_history',
+                child: Text(
+                  'Clear history',
+                  style: TextStyle(color: colors.textPrimary),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'delete_conversation',
+                child: Text(
+                  'Delete conversation',
+                  style: TextStyle(color: colors.error),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -397,19 +684,187 @@ class _MessageBubble extends ConsumerWidget {
   final Map<String, dynamic> message;
   final DmConversation conversation;
   final String channelId;
+  final void Function(String messageId, String content) onEdit;
 
   const _MessageBubble({
     required this.message,
     required this.conversation,
     required this.channelId,
+    required this.onEdit,
   });
+
+  TextSpan _parseRichText(String text, TextStyle defaultStyle) {
+    if (text.isEmpty) return TextSpan(style: defaultStyle, text: '');
+
+    final boldRegex = RegExp(r'\*\*(.*?)\*\*', dotAll: true);
+    final italicRegex = RegExp(r'(?<!\*)\*(.*?)\*(?!\*)', dotAll: true);
+    final strikeRegex = RegExp(r'~~(.*?)~~', dotAll: true);
+    final codeRegex = RegExp(r'`(.*?)`', dotAll: true);
+
+    final allPatterns = [boldRegex, italicRegex, strikeRegex, codeRegex];
+    final combined = RegExp(
+      allPatterns.map((r) => r.pattern).join('|'),
+      dotAll: true,
+    );
+
+    final spans = <TextSpan>[];
+    int lastEnd = 0;
+
+    for (final match in combined.allMatches(text)) {
+      if (match.start > lastEnd) {
+        spans.add(
+          TextSpan(
+            text: text.substring(lastEnd, match.start),
+            style: defaultStyle,
+          ),
+        );
+      }
+
+      final raw = match.group(0)!;
+      if (boldRegex.hasMatch(raw)) {
+        final inner =
+            match.group(1) ?? boldRegex.firstMatch(raw)?.group(1) ?? raw;
+        spans.add(
+          TextSpan(
+            text: inner,
+            style: defaultStyle.copyWith(fontWeight: FontWeight.bold),
+          ),
+        );
+      } else if (strikeRegex.hasMatch(raw)) {
+        final inner = strikeRegex.firstMatch(raw)?.group(1) ?? raw;
+        spans.add(
+          TextSpan(
+            text: inner,
+            style: defaultStyle.copyWith(
+              decoration: TextDecoration.lineThrough,
+            ),
+          ),
+        );
+      } else if (codeRegex.hasMatch(raw)) {
+        final inner = codeRegex.firstMatch(raw)?.group(1) ?? raw;
+        spans.add(
+          TextSpan(
+            text: inner,
+            style: defaultStyle.copyWith(
+              fontFamily: 'monospace',
+              backgroundColor: const Color(0x1A6458F5),
+              color: const Color(0xFF6458F5),
+            ),
+          ),
+        );
+      } else if (italicRegex.hasMatch(raw)) {
+        final inner = italicRegex.firstMatch(raw)?.group(1) ?? raw;
+        spans.add(
+          TextSpan(
+            text: inner,
+            style: defaultStyle.copyWith(fontStyle: FontStyle.italic),
+          ),
+        );
+      } else {
+        spans.add(TextSpan(text: raw, style: defaultStyle));
+      }
+      lastEnd = match.end;
+    }
+
+    if (lastEnd < text.length) {
+      spans.add(TextSpan(text: text.substring(lastEnd), style: defaultStyle));
+    }
+
+    return TextSpan(style: defaultStyle, children: spans);
+  }
+
+  /// Splits [text] around Markdown thematic breaks: a line that is exactly
+  /// `---` at the start of the message or after a blank line. A `---` right
+  /// under a line of text is a setext heading in Markdown, so it stays text.
+  static List<String> _splitOnDividers(String text) {
+    final parts = <String>[];
+    final current = <String>[];
+    String joined() => current.join('\n').replaceAll(RegExp(r'^\n+|\n+$'), '');
+
+    for (final line in text.split('\n')) {
+      final afterBlank = current.isEmpty || current.last.trim().isEmpty;
+      if (line.trim() == '---' && afterBlank) {
+        parts.add(joined());
+        current.clear();
+      } else {
+        current.add(line);
+      }
+    }
+    parts.add(joined());
+    return parts;
+  }
+
+  Widget _buildMessageText(String content, TextStyle style) {
+    final parts = _splitOnDividers(content);
+    if (parts.length == 1) {
+      return RichText(text: _parseRichText(content, style));
+    }
+
+    final divider = Divider(
+      height: 16,
+      thickness: 1,
+      color: style.color?.withValues(alpha: 0.4),
+    );
+    // The rule spans the bubble's text width, with a floor so a message that
+    // is only a divider still shows a visible line.
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 120),
+      child: IntrinsicWidth(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < parts.length; i++) ...[
+              if (i > 0) divider,
+              if (parts[i].isNotEmpty)
+                RichText(text: _parseRichText(parts[i], style)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmDelete(
+    BuildContext context,
+    WidgetRef ref,
+    String messageId,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete message?'),
+        content: const Text(
+          'This deletes the message for everyone and cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await ref.read(chatHistoryProvider(channelId)).deleteMessage(messageId);
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.colors;
     final history = ref.watch(chatHistoryProvider(channelId));
     final isMe = history.isMyMessage(message);
-    final content = message['content'] as String? ?? '';
+    final rawContent = message['content'] as String? ?? '';
+    // A voice note or file sent without text carries an empty paragraph
+    // (`<p></p>`). Show no text bubble for it instead of the literal tags.
+    final content = rawContent.replaceAll(RegExp(r'<[^>]*>'), '').trim().isEmpty
+        ? ''
+        : rawContent;
     final createdAt =
         DateTime.tryParse(message['created_at']?.toString() ?? '')?.toLocal() ??
         DateTime.now();
@@ -494,30 +949,49 @@ class _MessageBubble extends ConsumerWidget {
                   ),
                 ),
                 if (content.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isMe
-                          ? colors.primary
-                          : colors.onPrimary.withValues(alpha: 0.05),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: DmMessageBody(
-                      content: content,
-                      textStyle: TextStyle(
-                        color: isMe ? Colors.white : colors.textPrimary,
-                        fontSize: 14,
+                  _OwnMessageMenu(
+                    enabled: isMe && status == null,
+                    onEdit: () => onEdit(messageId, rawContent),
+                    onDelete: () => _confirmDelete(context, ref, messageId),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
                       ),
-                      accentColor: colors.primary,
+                      decoration: BoxDecoration(
+                        color: isMe
+                            ? colors.primary
+                            : colors.onPrimary.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      // DM history comes from the threads route, where messages
+                      // sent from Zedu web are HTML; convert them to Markdown.
+                      child: _buildMessageText(
+                        DmMessageBody.toMarkdown(content),
+                        TextStyle(
+                          color: isMe ? Colors.white : colors.textPrimary,
+                          fontSize: 14,
+                        ),
+                      ),
                     ),
                   ),
                 if (media.isNotEmpty)
                   Padding(
                     padding: EdgeInsets.only(top: content.isNotEmpty ? 8 : 0),
-                    child: _AttachmentBubbleList(media: media, isMe: isMe),
+                    child: content.isNotEmpty
+                        ? _AttachmentBubbleList(media: media, isMe: isMe)
+                        // No text to hang the menu on, so it goes on the
+                        // attachments (Delete only: there is nothing to edit).
+                        : _OwnMessageMenu(
+                            enabled: isMe && status == null,
+                            onEdit: null,
+                            onDelete: () =>
+                                _confirmDelete(context, ref, messageId),
+                            child: _AttachmentBubbleList(
+                              media: media,
+                              isMe: isMe,
+                            ),
+                          ),
                   ),
                 if (isMe && status != null)
                   Padding(
@@ -690,6 +1164,72 @@ class _AttachmentBubbleList extends StatelessWidget {
 
         return _buildGenericFile(fileName, fileLink, isImage, context);
       }).toList(),
+    );
+  }
+}
+
+/// Shows a "more" button on hover, and a right-click or long-press menu, for
+/// your own messages, with Edit and Delete. The long press is for touch input,
+/// where there is no hover or right click.
+class _OwnMessageMenu extends StatefulWidget {
+  const _OwnMessageMenu({
+    required this.enabled,
+    required this.onEdit,
+    required this.onDelete,
+    required this.child,
+  });
+
+  final bool enabled;
+  final VoidCallback? onEdit;
+  final VoidCallback onDelete;
+  final Widget child;
+
+  @override
+  State<_OwnMessageMenu> createState() => _OwnMessageMenuState();
+}
+
+class _OwnMessageMenuState extends State<_OwnMessageMenu> {
+  final _menuKey = GlobalKey<PopupMenuButtonState<String>>();
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.enabled) return widget.child;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onSecondaryTap: () => _menuKey.currentState?.showButtonMenu(),
+        onLongPress: () => _menuKey.currentState?.showButtonMenu(),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Opacity(
+              opacity: _hovered ? 1 : 0,
+              child: PopupMenuButton<String>(
+                key: _menuKey,
+                tooltip: 'Message actions',
+                icon: const Icon(Icons.more_horiz, size: 18),
+                onSelected: (value) =>
+                    value == 'edit' ? widget.onEdit?.call() : widget.onDelete(),
+                itemBuilder: (_) => [
+                  if (widget.onEdit != null)
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Text('Edit message'),
+                    ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Text('Delete message'),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(child: widget.child),
+          ],
+        ),
+      ),
     );
   }
 }
