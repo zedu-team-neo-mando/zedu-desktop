@@ -75,8 +75,8 @@ class UserProfileRepositoryImpl implements UserProfileRepository {
   }
 
   @override
-  Future<Result<void>> deleteOrganization() {
-    return _guard(_remote.deleteOrganization);
+  Future<Result<void>> deleteOrganization(String orgId) {
+    return _guard(() => _remote.deleteOrganization(orgId));
   }
 
   @override
