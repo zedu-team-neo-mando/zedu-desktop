@@ -53,4 +53,42 @@ void main() {
       expect(saved.phoneNumber, '+2348012345678');
     });
   });
+
+  group('UserProfileRemoteDataSourceImpl.deleteOrganization', () {
+    late MockApiBaseService mockApi;
+
+    setUp(() => mockApi = MockApiBaseService());
+
+    UserProfileRemoteDataSourceImpl dataSource({required bool mock}) =>
+        UserProfileRemoteDataSourceImpl(
+          config: AppConfig(apiBaseUrl: '', usesMockData: mock),
+          apiBaseService: mockApi,
+        );
+
+    test('calls DELETE /organisations/{orgId}', () async {
+      when(
+        () => mockApi.delete<Map<String, dynamic>>(path: any(named: 'path')),
+      ).thenAnswer(
+        (_) async => const ApiResponseModel<Map<String, dynamic>>(
+          data: {},
+          statusCode: 200,
+        ),
+      );
+
+      await dataSource(mock: false).deleteOrganization('org_1');
+
+      verify(
+        () =>
+            mockApi.delete<Map<String, dynamic>>(path: '/organisations/org_1'),
+      ).called(1);
+    });
+
+    test('makes no request in mock mode', () async {
+      await dataSource(mock: true).deleteOrganization('org_1');
+
+      verifyNever(
+        () => mockApi.delete<Map<String, dynamic>>(path: any(named: 'path')),
+      );
+    });
+  });
 }

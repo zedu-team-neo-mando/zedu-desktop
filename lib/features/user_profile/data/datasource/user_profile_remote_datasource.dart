@@ -25,7 +25,7 @@ abstract interface class UserProfileRemoteDataSource {
   Future<OrganizationProfileModel> updateOrganization(
     OrganizationProfile organization,
   );
-  Future<void> deleteOrganization();
+  Future<void> deleteOrganization(String orgId);
   Future<List<TeamMemberModel>> getTeamMembers({String? orgId});
   Future<TeamMemberModel> inviteMember({
     required String email,
@@ -254,10 +254,10 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
   }
 
   @override
-  Future<void> deleteOrganization() async {
+  Future<void> deleteOrganization(String orgId) async {
     if (_config.usesMockData) return;
     await _apiBaseService.delete<Map<String, dynamic>>(
-      path: '/profile/organization',
+      path: '/organisations/$orgId',
     );
   }
 

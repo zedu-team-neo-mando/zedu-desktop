@@ -248,14 +248,20 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
   }
 
   Future<void> deleteOrganization() async {
+    final orgId = ref.read(workspaceProvider).selectedWorkspace?.id;
+    if (orgId == null) {
+      state = state.copyWith(error: 'No organisation is selected.');
+      return;
+    }
     state = state.copyWith(
       isSaving: true,
       clearError: true,
       clearSuccess: true,
     );
-    final result = await _repository.deleteOrganization();
+    final result = await _repository.deleteOrganization(orgId);
     switch (result) {
       case Success<void>():
+        ref.read(workspaceProvider.notifier).removeWorkspace(orgId);
         state = state.copyWith(
           isSaving: false,
           successMessage: 'Organization deleted successfully.',
