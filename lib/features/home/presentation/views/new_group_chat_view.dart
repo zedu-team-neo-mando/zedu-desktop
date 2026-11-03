@@ -130,7 +130,10 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
             SnackBar(
               content: Row(
                 children: [
-                  Icon(Icons.check_circle_outline, color: context.colors.onPrimary),
+                  Icon(
+                    Icons.check_circle_outline,
+                    color: context.colors.onPrimary,
+                  ),
                   const SizedBox(width: 8),
                   Text('Group DM "${newGroup.name}" created successfully!'),
                 ],
@@ -259,7 +262,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
                                   maxHeight: 250,
                                 ),
                                 decoration: BoxDecoration(
-                                      color: context.colors.onPrimary,
+                                  color: context.colors.onPrimary,
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(color: colors.divider),
                                 ),

@@ -97,12 +97,7 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
                   child: Row(
                     children: [
                       Expanded(
-                        child: _buildVideoFeed(
-                          colors.success,
-                          'You',
-                          null,
-                          80,
-                        ),
+                        child: _buildVideoFeed(colors.success, 'You', null, 80),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -332,7 +327,11 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
                   ? NetworkImage(avatarUrl)
                   : null,
               child: avatarUrl == null || avatarUrl.isEmpty
-                  ? Icon(Icons.person, size: 24, color: AppPalette.light.onPrimary)
+                  ? Icon(
+                      Icons.person,
+                      size: 24,
+                      color: AppPalette.light.onPrimary,
+                    )
                   : null,
             ),
           ),
@@ -378,7 +377,11 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
             color: color,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, color: AppPalette.light.onPrimary, size: small ? 18 : 24),
+          child: Icon(
+            icon,
+            color: AppPalette.light.onPrimary,
+            size: small ? 18 : 24,
+          ),
         ),
       ),
     );

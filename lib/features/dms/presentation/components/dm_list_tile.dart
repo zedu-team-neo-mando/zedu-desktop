@@ -112,7 +112,7 @@ class DmListTile extends ConsumerWidget {
               ? Text(
                   conversation.displayName[0].toUpperCase(),
                   style: TextStyle(
-                          color: colors.onPrimary,
+                    color: colors.onPrimary,
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
@@ -150,7 +150,7 @@ class DmListTile extends ConsumerWidget {
                       child: Text(
                         'Draft',
                         style: TextStyle(
-                    color: colors.onPrimary,
+                          color: colors.onPrimary,
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 0.5,

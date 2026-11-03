@@ -110,7 +110,9 @@ class _ProfileTopBar extends StatelessWidget {
                 ),
                 contentPadding: const EdgeInsets.symmetric(vertical: 8),
               ),
-              style: context.textTheme.bodySmall?.copyWith(color: context.colors.onPrimary),
+              style: context.textTheme.bodySmall?.copyWith(
+                color: context.colors.onPrimary,
+              ),
             ),
           ),
           const Spacer(flex: 2),

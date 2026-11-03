@@ -71,11 +71,7 @@ class AttachmentPreviewBar extends StatelessWidget {
                       color: colors.error,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
-                      Icons.close,
-                      size: 11,
-                      color: colors.onPrimary,
-                    ),
+                    child: Icon(Icons.close, size: 11, color: colors.onPrimary),
                   ),
                 ),
               ),

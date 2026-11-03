@@ -225,8 +225,9 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
   }
 
   void _showActionNotice(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -975,7 +976,7 @@ class _MessageBubble extends ConsumerWidget {
                   ? Text(
                       senderInitial,
                       style: TextStyle(
-                    color: colors.onPrimary,
+                        color: colors.onPrimary,
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
                       ),

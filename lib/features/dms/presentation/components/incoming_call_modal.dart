@@ -109,9 +109,9 @@ class IncomingCallModal extends ConsumerWidget {
                     onPressed: () {
                       ref.read(activeCallProvider.notifier).acceptCall();
                     },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: colors.success,
-                        foregroundColor: colors.onPrimary,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: colors.success,
+                      foregroundColor: colors.onPrimary,
                     ),
                     icon: const Icon(Icons.call, size: 18),
                     label: const Text('Accept'),

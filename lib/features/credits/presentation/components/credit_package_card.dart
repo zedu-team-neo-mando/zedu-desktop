@@ -209,7 +209,7 @@ class CreditPackageCard extends StatelessWidget {
                                 height: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-        color: colors.background,
+                                  color: colors.background,
                                 ),
                               )
                             : FittedBox(
