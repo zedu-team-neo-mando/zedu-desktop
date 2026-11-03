@@ -27,7 +27,7 @@ class UserMenuDialog extends ConsumerWidget {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
+              color: colors.textPrimary.withValues(alpha: 0.1),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -55,10 +55,10 @@ class UserMenuDialog extends ConsumerWidget {
                             color: colors.sidebar,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Center(
+                          child: Center(
                             child: Icon(
                               Icons.person,
-                              color: Colors.white,
+                              color: colors.onPrimary,
                               size: 32,
                             ),
                           ),

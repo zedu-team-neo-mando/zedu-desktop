@@ -13,7 +13,7 @@ class UserMenuButton extends ConsumerWidget {
       onTap: () {
         showDialog<void>(
           context: context,
-          barrierColor: Colors.black.withValues(alpha: 0.3),
+          barrierColor: colors.textPrimary.withValues(alpha: 0.3),
           builder: (context) => const UserMenuDialog(),
         );
       },
