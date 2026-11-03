@@ -28,6 +28,7 @@ class UserManagementSection extends StatefulWidget {
 
 class _UserManagementSectionState extends State<UserManagementSection> {
   final _searchController = TextEditingController();
+  final _tableScrollController = ScrollController();
   String _roleFilter = 'All Roles';
   int _currentPage = 1;
   static const int _pageSize = 10;
@@ -36,6 +37,7 @@ class _UserManagementSectionState extends State<UserManagementSection> {
   @override
   void dispose() {
     _searchController.dispose();
+    _tableScrollController.dispose();
     super.dispose();
   }
 
@@ -117,30 +119,28 @@ class _UserManagementSectionState extends State<UserManagementSection> {
               children: [
                 Padding(
                   padding: const EdgeInsets.all(20),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 300,
-                        child: TextField(
-                          controller: _searchController,
-                          onChanged: (_) => setState(() {
-                            _currentPage = 1;
-                          }),
-                          decoration: InputDecoration(
-                            hintText: 'Search by name or email',
-                            prefixIcon: const Icon(Icons.search, size: 18),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 12,
-                            ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isNarrow = constraints.maxWidth < 480;
+                      final searchField = TextField(
+                        controller: _searchController,
+                        onChanged: (_) => setState(() {
+                          _currentPage = 1;
+                        }),
+                        decoration: InputDecoration(
+                          hintText: 'Search by name or email',
+                          prefixIcon: const Icon(Icons.search, size: 18),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      DropdownButton<String>(
+                      );
+
+                      final roleDropdown = DropdownButton<String>(
                         value: _roleFilter,
                         underline: const SizedBox(),
                         items: const [
@@ -162,8 +162,36 @@ class _UserManagementSectionState extends State<UserManagementSection> {
                           _roleFilter = value ?? 'All Roles';
                           _currentPage = 1;
                         }),
-                      ),
-                    ],
+                      );
+
+                      if (isNarrow) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            searchField,
+                            const SizedBox(height: 12),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: roleDropdown,
+                            ),
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        children: [
+                          Flexible(
+                            fit: FlexFit.loose,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 320),
+                              child: searchField,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          roleDropdown,
+                        ],
+                      );
+                    },
                   ),
                 ),
                 if (filtered.isEmpty)
@@ -186,7 +214,7 @@ class _UserManagementSectionState extends State<UserManagementSection> {
                             child: Icon(
                               hasActiveFilter
                                   ? Icons.search_off_rounded
-                                  : Icons.people_outline_rounded,
+                                  : Icons.group_outlined,
                               size: 28,
                               color: context.colors.textHint,
                             ),
@@ -196,6 +224,11 @@ class _UserManagementSectionState extends State<UserManagementSection> {
                             hasActiveFilter
                                 ? 'No members match your search.'
                                 : 'No members found.',
+                            key: Key(
+                              hasActiveFilter
+                                  ? 'search_empty_state_title'
+                                  : 'team_empty_state_title',
+                            ),
                             style: context.textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.w600,
                               color: context.colors.textPrimary,
@@ -204,8 +237,13 @@ class _UserManagementSectionState extends State<UserManagementSection> {
                           const SizedBox(height: 6),
                           Text(
                             hasActiveFilter
-                                ? 'Try adjusting your search terms or role filters.'
-                                : 'Invite people to your team to start collaborating.',
+                                ? 'Try searching for a different name, email, or role.'
+                                : 'Invite people to your team to collaborate in Zedu.',
+                            key: Key(
+                              hasActiveFilter
+                                  ? 'search_empty_state_subtitle'
+                                  : 'team_empty_state_subtitle',
+                            ),
                             textAlign: TextAlign.center,
                             style: context.textTheme.bodySmall?.copyWith(
                               color: context.colors.textSecondary.withValues(
@@ -218,61 +256,113 @@ class _UserManagementSectionState extends State<UserManagementSection> {
                     ),
                   )
                 else
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minWidth: 880),
-                      child: DataTable(
-                        headingRowColor: WidgetStateProperty.all(
-                          const Color(0xFFFAFAFA),
-                        ),
-                        columns: const [
-                          DataColumn(label: Text('Email Address')),
-                          DataColumn(label: Text('Role')),
-                          DataColumn(label: Text('Date Joined')),
-                          DataColumn(label: Text('Status')),
-                          DataColumn(label: Text('Actions')),
-                        ],
-                        rows: paginatedMembers.map((member) {
-                          return DataRow(
-                            cells: [
-                              DataCell(_MemberIdentity(email: member.email)),
-                              DataCell(Text(member.role)),
-                              DataCell(Text(member.dateJoined)),
-                              DataCell(
-                                ProfileStatusPill(status: member.status.name),
-                              ),
-                              DataCell(
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    SquareIconButton(
-                                      icon: Icons.edit_outlined,
-                                      size: 28,
-                                      onTap: () => _showMemberDialog(
-                                        context,
-                                        member,
-                                        widget.onUpdate,
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      return Scrollbar(
+                        controller: _tableScrollController,
+                        thumbVisibility: true,
+                        child: SingleChildScrollView(
+                          controller: _tableScrollController,
+                          scrollDirection: Axis.horizontal,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minWidth: constraints.maxWidth < 650
+                                  ? 650
+                                  : constraints.maxWidth,
+                            ),
+                            child: DataTable(
+                              columnSpacing: 24,
+                              horizontalMargin: 20,
+                              columns: const [
+                                DataColumn(label: Text('Name')),
+                                DataColumn(label: Text('Role')),
+                                DataColumn(label: Text('Date Joined')),
+                                DataColumn(label: Text('Status')),
+                                DataColumn(label: Text('Actions')),
+                              ],
+                              rows: paginatedMembers.map((member) {
+                                return DataRow(
+                                  cells: [
+                                    DataCell(
+                                      ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                          maxWidth: 220,
+                                          minWidth: 140,
+                                        ),
+                                        child: _MemberIdentity(
+                                          email: member.email,
+                                        ),
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    SquareIconButton(
-                                      icon: Icons.delete_outline,
-                                      size: 28,
-                                      onTap: () => _confirmRemove(
-                                        context,
-                                        member.email,
-                                        () async => widget.onRemove(member.id),
+                                    DataCell(
+                                      ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                          maxWidth: 130,
+                                        ),
+                                        child: Text(
+                                          member.role,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ),
+                                    DataCell(
+                                      ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                          maxWidth: 130,
+                                        ),
+                                        child: Text(
+                                          member.dateJoined,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ),
+                                    DataCell(
+                                      ProfileStatusPill(
+                                        status: member.status.name,
+                                      ),
+                                    ),
+                                    DataCell(
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          right: 8,
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            SquareIconButton(
+                                              icon: Icons.edit_outlined,
+                                              size: 28,
+                                              onTap: () => _showMemberDialog(
+                                                context,
+                                                member,
+                                                widget.onUpdate,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            SquareIconButton(
+                                              icon: Icons.delete_outline,
+                                              size: 28,
+                                              onTap: () => _confirmRemove(
+                                                context,
+                                                member.email,
+                                                () async =>
+                                                    widget.onRemove(member.id),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ],
-                                ),
-                              ),
-                            ],
-                          );
-                        }).toList(),
-                      ),
-                    ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 if (totalPages > 1) ...[
                   const Divider(height: 1),
@@ -367,13 +457,12 @@ class _UserManagementSectionState extends State<UserManagementSection> {
                 : SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(minWidth: 880),
+                      constraints: const BoxConstraints(minWidth: 600),
                       child: DataTable(
-                        headingRowColor: WidgetStateProperty.all(
-                          const Color(0xFFFAFAFA),
-                        ),
+                        columnSpacing: 24,
+                        horizontalMargin: 20,
                         columns: const [
-                          DataColumn(label: Text('Email Address')),
+                          DataColumn(label: Text('Email')),
                           DataColumn(label: Text('Role')),
                           DataColumn(label: Text('Date Invited')),
                           DataColumn(label: Text('Status')),
@@ -528,6 +617,7 @@ class _MemberIdentity extends StatelessWidget {
             email,
             style: context.textTheme.bodyMedium,
             overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
         ),
       ],
