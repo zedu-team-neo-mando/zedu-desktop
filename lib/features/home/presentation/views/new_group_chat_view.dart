@@ -114,7 +114,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
             SnackBar(
               content: Row(
                 children: [
-                  const Icon(Icons.info_outline, color: Colors.white),
+                  Icon(Icons.info_outline, color: context.colors.onPrimary),
                   const SizedBox(width: 8),
                   Text(
                     'Opening existing conversation with ${newGroup.name}...',
@@ -130,7 +130,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
             SnackBar(
               content: Row(
                 children: [
-                  const Icon(Icons.check_circle_outline, color: Colors.white),
+                  Icon(Icons.check_circle_outline, color: context.colors.onPrimary),
                   const SizedBox(width: 8),
                   Text('Group DM "${newGroup.name}" created successfully!'),
                 ],
@@ -259,7 +259,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
                                   maxHeight: 250,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.white,
+                                      color: context.colors.onPrimary,
                                   borderRadius: BorderRadius.circular(8),
                                   border: Border.all(color: colors.divider),
                                 ),
@@ -366,7 +366,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
           // 4. Loading/Saving Spinner Overlay
           if (_isLoading)
             Container(
-              color: Colors.white.withValues(alpha: 0.7),
+              color: colors.onPrimary.withValues(alpha: 0.7),
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -389,14 +389,14 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
           // 5. Error & Retry Full Overlay
           if (_errorMessage != null)
             Container(
-              color: Colors.white.withValues(alpha: 0.95),
+              color: colors.onPrimary.withValues(alpha: 0.95),
               padding: const EdgeInsets.all(32),
               child: Center(
                 child: Container(
                   constraints: const BoxConstraints(maxWidth: 500),
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: colors.onPrimary,
                     border: Border.all(
                       color: colors.error.withValues(alpha: 0.3),
                     ),
@@ -457,7 +457,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: colors.primary,
-                              foregroundColor: Colors.white,
+                              foregroundColor: colors.onPrimary,
                             ),
                             child: const Text('Retry'),
                           ),
@@ -478,7 +478,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
       height: 60,
       padding: const EdgeInsets.symmetric(horizontal: 24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colors.onPrimary,
         border: Border(bottom: BorderSide(color: colors.divider)),
       ),
       child: Row(
@@ -532,7 +532,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
             onPressed: _selectedMembers.length >= 2 ? _handleCreate : null,
             style: ElevatedButton.styleFrom(
               backgroundColor: colors.primary,
-              foregroundColor: Colors.white,
+              foregroundColor: colors.onPrimary,
               disabledBackgroundColor: colors.divider,
               disabledForegroundColor: colors.textHint,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -576,7 +576,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
   Widget _buildBottomMessageEditor(AppPalette colors) {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-      decoration: const BoxDecoration(color: Colors.white),
+      decoration: BoxDecoration(color: colors.onPrimary),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(

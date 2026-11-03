@@ -55,8 +55,8 @@ class DmSidebarList extends ConsumerWidget {
             child: ref
                 .watch(dmListProvider)
                 .when(
-                  loading: () => const Center(
-                    child: CircularProgressIndicator(color: Colors.white),
+                  loading: () => Center(
+                    child: CircularProgressIndicator(color: colors.onPrimary),
                   ),
                   error: (err, stack) => Center(
                     child: Text(
