@@ -144,5 +144,23 @@ void main() {
       expect(createAccountButton, findsOneWidget);
       await drainToastTimer(tester);
     });
+
+    testWidgets('consent line uses sentence case for "signing up"', (
+      tester,
+    ) async {
+      await pumpDesktopSignUp(tester, FakeAuthNotifier());
+
+      expect(
+        find.textContaining(
+          'By signing up, you agree to our terms of service and privacy policy',
+          findRichText: true,
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('By Signing up', findRichText: true),
+        findsNothing,
+      );
+    });
   });
 }
