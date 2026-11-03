@@ -352,7 +352,9 @@ class _MessageBody extends StatelessWidget {
                                 vertical: 6,
                               ),
                               decoration: BoxDecoration(
-                                color: colors.textPrimary,
+                                color: colors.textPrimary.withValues(
+                                  alpha: 0.54,
+                                ),
                                 borderRadius: BorderRadius.only(
                                   bottomLeft: Radius.circular(8),
                                   bottomRight: Radius.circular(8),
