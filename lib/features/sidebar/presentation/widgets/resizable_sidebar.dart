@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:zedu/core/core.dart';
 
 class ResizableSidebar extends StatefulWidget {
   const ResizableSidebar({
@@ -62,7 +63,7 @@ class _ResizableSidebarState extends State<ResizableSidebar> {
                   child: Container(
                     width: 2,
                     margin: const EdgeInsets.only(right: 4),
-                    color: Colors.white.withValues(alpha: 0.12),
+                    color: Colors.black.withValues(alpha: 0.3),
                   ),
                 ),
               ),

@@ -407,7 +407,7 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                           border: Border.all(color: colors.divider),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.2),
+                              color: colors.textPrimary.withValues(alpha: 0.2),
                               blurRadius: 16,
                               offset: const Offset(0, 4),
                             ),
@@ -444,7 +444,7 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                             IconButton(
                               icon: const Icon(Icons.call_end),
                               tooltip: 'Cancel call',
-                              color: Colors.red,
+                              color: colors.error,
                               onPressed: () {
                                 ref
                                     .read(activeCallProvider.notifier)
@@ -475,10 +475,10 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                         color: colors.primary,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Text(
+                      child: Text(
                         'Drop files to attach',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: colors.onPrimary,
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
@@ -625,8 +625,8 @@ class _DmChatHeader extends StatelessWidget {
             child: conversation.effectiveAvatarUrl == null
                 ? Text(
                     participantInitial,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: colors.onPrimary,
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                     ),
@@ -974,8 +974,8 @@ class _MessageBubble extends ConsumerWidget {
               child: senderAvatarUrl == null || senderAvatarUrl.isEmpty
                   ? Text(
                       senderInitial,
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                    color: colors.onPrimary,
                         fontWeight: FontWeight.w600,
                         fontSize: 12,
                       ),
@@ -1030,7 +1030,7 @@ class _MessageBubble extends ConsumerWidget {
                       child: _buildMessageText(
                         content,
                         TextStyle(
-                          color: isMe ? Colors.white : colors.textPrimary,
+                          color: isMe ? colors.onPrimary : colors.textPrimary,
                           fontSize: 14,
                         ),
                       ),
