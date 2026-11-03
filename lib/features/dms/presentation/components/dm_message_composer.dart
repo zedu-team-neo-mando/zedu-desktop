@@ -799,6 +799,9 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
           }
         }
         final length = await file.length();
+        // The composer can be disposed (e.g. the user switched conversation)
+        // while file sizes are still being read.
+        if (!mounted) return;
         if (length > 20 * 1024 * 1024) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -820,6 +823,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
         }
       }
     }
+    if (!mounted) return;
     setState(() {
       _pendingFiles.addAll(validFiles);
     });
