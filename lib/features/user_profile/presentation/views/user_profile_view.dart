@@ -37,11 +37,12 @@ class UserProfileView extends ConsumerWidget {
     // Never show placeholder "Anonymous user" values as fallbacks. If the
     // profile account hasn't loaded yet, derive the account from the
     // authenticated user's data so the real name and email are shown.
-    final account = state.account != null
-        ? accountForAuthenticatedUser(state.account, authenticatedUser)
+    final loadedAccount = state.account;
+    final account = loadedAccount != null
+        ? accountForAuthenticatedUser(loadedAccount, authenticatedUser)
         : authenticatedUser != null
-            ? profileAccountFromAuthUser(authenticatedUser)
-            : ProfileAccount.empty();
+        ? profileAccountFromAuthUser(authenticatedUser)
+        : ProfileAccount.empty();
 
     return ProfileSettingsShell(
       selectedSection: state.section,

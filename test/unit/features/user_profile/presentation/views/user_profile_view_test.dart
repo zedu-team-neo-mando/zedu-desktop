@@ -16,21 +16,26 @@ ProfileAccount buildAccount({
   );
 }
 
-User buildSessionUser() {
+User buildSessionUser({
+  String firstName = 'Ada',
+  String lastName = 'Okafor',
+  String email = 'ada@zedu.chat',
+  String username = 'ada',
+  String avatarUrl = 'https://example.com/session.png',
+}) {
   return User(
     id: 'user-1',
-    firstName: 'Ada',
-    lastName: 'Okafor',
-    fullName: 'Ada Okafor',
-    email: 'ada@zedu.chat',
+    firstName: firstName,
+    lastName: lastName,
+    email: email,
     phone: '08000000000',
-    username: 'ada',
+    username: username,
     isVerified: true,
     isOnboarded: true,
     createdAt: DateTime(2026, 1, 1),
     currentOrg: 'org-1',
     currentOrganisationSlug: 'zedu-org',
-    avatarUrl: 'https://example.com/session.png',
+    avatarUrl: avatarUrl,
     defaultAvatarUrl: '',
   );
 }
@@ -159,31 +164,31 @@ void main() {
       });
     });
   });
-+
-+  group('profileAccountFromAuthUser', () {
-+    test('builds account from authenticated user data', () {
-+      final account = profileAccountFromAuthUser(buildSessionUser());
-+
-+      expect(account.name, 'Ada Okafor');
-+      expect(account.email, 'ada@zedu.chat');
-+      expect(account.username, 'ada');
-+      expect(account.avatarUrl, 'https://example.com/session.png');
-+    });
-+
-+    test('falls back to username when fullname is empty', () {
-+      final user = buildSessionUser().copyWith(fullName: '');
-+      final account = profileAccountFromAuthUser(user);
-+
-+      expect(account.name, 'ada');
-+      expect(account.email, 'ada@zedu.chat');
-+    });
-+
-+    test('does not use placeholder values', () {
-+      final account = profileAccountFromAuthUser(buildSessionUser());
-+
-+      expect(account.name, isNot('Anonymous user'));
-+      expect(account.email, isNot('anonymoususer@email.com'));
-+      expect(account.username, isNot('anonymoususer'));
-+    });
-+  });
-+});
+
+  group('profileAccountFromAuthUser', () {
+    test('builds account from authenticated user data', () {
+      final account = profileAccountFromAuthUser(buildSessionUser());
+
+      expect(account.name, 'Ada Okafor');
+      expect(account.email, 'ada@zedu.chat');
+      expect(account.username, 'ada');
+      expect(account.avatarUrl, 'https://example.com/session.png');
+    });
+
+    test('falls back to username when fullname is empty', () {
+      final user = buildSessionUser(firstName: '', lastName: '');
+      final account = profileAccountFromAuthUser(user);
+
+      expect(account.name, 'ada');
+      expect(account.email, 'ada@zedu.chat');
+    });
+
+    test('does not use placeholder values', () {
+      final account = profileAccountFromAuthUser(buildSessionUser());
+
+      expect(account.name, isNot('Anonymous user'));
+      expect(account.email, isNot('anonymoususer@email.com'));
+      expect(account.username, isNot('anonymoususer'));
+    });
+  });
+}
