@@ -1,3 +1,4 @@
+import 'package:characters/characters.dart';
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -66,8 +67,8 @@ class NotificationService {
       }
     }
 
-    if (contentPreview.length > 80) {
-      contentPreview = '${contentPreview.substring(0, 77)}...';
+    if (contentPreview.characters.length > 80) {
+      contentPreview = '${contentPreview.characters.take(77)}...';
     }
 
     final notification = LocalNotification(
