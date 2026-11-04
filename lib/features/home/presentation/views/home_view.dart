@@ -507,9 +507,37 @@ class _ChannelHeaderMenu extends ConsumerWidget {
       position: PopupMenuPosition.under,
       icon: Icon(Icons.more_vert, color: colors.textHint),
       onSelected: (value) {
+        if (value == 'export') {
+          showDialog<void>(
+            context: context,
+            builder: (_) => ChannelExportDialog(channel: channel),
+          );
+        }
         if (value == 'leave') _confirmLeave(context, ref);
       },
       itemBuilder: (_) => [
+        PopupMenuItem(
+          value: 'export',
+          child: Row(
+            children: [
+              Icon(
+                Icons.download_outlined,
+                size: 18,
+                color: colors.textPrimary,
+              ),
+              const SizedBox(width: 12),
+              // The menu is at most 280 px wide; let the label shrink
+              // rather than overflow (e.g. with the app's text zoom).
+              Flexible(
+                child: Text(
+                  'Export history',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: colors.textPrimary),
+                ),
+              ),
+            ],
+          ),
+        ),
         PopupMenuItem(
           value: 'leave',
           child: Row(

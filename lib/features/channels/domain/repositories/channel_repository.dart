@@ -20,6 +20,12 @@ abstract class ChannelRepository {
 
   /// Removes the current user from the channel.
   Future<Result<void>> leaveChannel(String channelId);
+
+  /// Starts exporting the channel's history (or returns the running export).
+  Future<Result<ChannelExport>> startChannelExport(String channelId);
+
+  /// The latest export of the channel's history for the current user.
+  Future<Result<ChannelExport>> fetchChannelExportStatus(String channelId);
   Future<Result<List<String>>> fetchOrganisationMemberIds(String orgId);
   Future<Result<List<String>>> fetchChannelMemberIds(String channelId);
   Future<Result<List<DmParticipant>>> fetchChannelMembers(String channelId);

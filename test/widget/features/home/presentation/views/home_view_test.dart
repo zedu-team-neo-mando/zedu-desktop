@@ -37,6 +37,26 @@ class _LeavingChannelRepository extends _EmptyChannelRepository {
   }
 }
 
+/// Keeps every export running, so the export dialog stays on "Preparing".
+class _ExportingChannelRepository extends _EmptyChannelRepository {
+  final exported = <String>[];
+
+  @override
+  Future<Result<ChannelExport>> startChannelExport(String channelId) async {
+    exported.add(channelId);
+    return const Success(
+      ChannelExport(id: 'e1', status: ChannelExportStatus.pending),
+    );
+  }
+
+  @override
+  Future<Result<ChannelExport>> fetchChannelExportStatus(
+    String channelId,
+  ) async => const Success(
+    ChannelExport(id: 'e1', status: ChannelExportStatus.pending),
+  );
+}
+
 class FakeSecureStorageService extends Fake implements SecureStorageService {
   final _values = <String, String>{};
 
@@ -276,6 +296,27 @@ void main() {
       expect(find.text('You cannot leave this channel'), findsOneWidget);
       expect(find.text('# random'), findsOneWidget);
       await tester.pump(const Duration(seconds: 5));
+    });
+
+    testWidgets('the header menu exports the channel history (Ziki #2629)', (
+      tester,
+    ) async {
+      final repository = _ExportingChannelRepository();
+      await pumpSidebarAndChat(tester, repository: repository);
+      await tester.tap(find.text('random'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('channel-header-menu')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Export history'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Export #random'), findsOneWidget);
+      expect(repository.exported, ['channel-random']);
+
+      await tester.tap(find.text('Close'));
+      await tester.pumpAndSettle();
     });
   });
 

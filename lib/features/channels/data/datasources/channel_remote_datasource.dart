@@ -35,6 +35,13 @@ abstract class ChannelRemoteDataSource {
     required String orgId,
     required String channelId,
   });
+
+  /// Starts an export of the channel's history, or returns the one that is
+  /// already running.
+  Future<ChannelExport> startExport(String channelId);
+
+  /// The latest export of the channel for this user.
+  Future<ChannelExport> fetchExportStatus(String channelId);
 }
 
 class ChannelRemoteDataSourceImpl implements ChannelRemoteDataSource {
@@ -131,6 +138,30 @@ class ChannelRemoteDataSourceImpl implements ChannelRemoteDataSource {
     await apiBaseService.post<Map<String, dynamic>>(
       path: '/channels/$channelId/leave',
     );
+  }
+
+  @override
+  Future<ChannelExport> startExport(String channelId) async {
+    final response = await apiBaseService.post<Map<String, dynamic>>(
+      path: '/channels/$channelId/export',
+    );
+    return _exportFrom(response.data);
+  }
+
+  @override
+  Future<ChannelExport> fetchExportStatus(String channelId) async {
+    final response = await apiBaseService.get<Map<String, dynamic>>(
+      path: '/channels/$channelId/export/status',
+    );
+    return _exportFrom(response.data);
+  }
+
+  static ChannelExport _exportFrom(Map<String, dynamic>? body) {
+    final data = body?['data'];
+    if (data is! Map<String, dynamic>) {
+      throw Exception('No export returned for the channel');
+    }
+    return ChannelExport.fromJson(data);
   }
 
   @override

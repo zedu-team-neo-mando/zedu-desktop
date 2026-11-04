@@ -89,6 +89,26 @@ class ChannelRepositoryImpl implements ChannelRepository {
   }
 
   @override
+  Future<Result<ChannelExport>> startChannelExport(String channelId) =>
+      _export(() => remoteDataSource.startExport(channelId));
+
+  @override
+  Future<Result<ChannelExport>> fetchChannelExportStatus(String channelId) =>
+      _export(() => remoteDataSource.fetchExportStatus(channelId));
+
+  Future<Result<ChannelExport>> _export(
+    Future<ChannelExport> Function() call,
+  ) async {
+    try {
+      return Success(await call());
+    } on ApiFailure catch (e) {
+      return Failure(e);
+    } catch (e) {
+      return Failure(ApiFailure(message: e.toString()));
+    }
+  }
+
+  @override
   Future<Result<List<String>>> fetchOrganisationMemberIds(String orgId) async {
     try {
       final ids = await remoteDataSource.fetchOrganisationMemberIds(orgId);
