@@ -175,7 +175,7 @@ class DmListTile extends ConsumerWidget {
                 )
               else
                 Text(
-                  conversation.previewMessage,
+                  HtmlUtils.toPlainText(conversation.previewMessage),
                   style: TextStyle(
                     color: hasUnread
                         ? colors.onPrimary

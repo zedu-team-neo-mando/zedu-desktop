@@ -409,7 +409,7 @@ class _ContactRow extends StatelessWidget {
           ),
         ),
         InkWell(
-          onTap: () {},
+          onTap: () => Clipboard.setData(ClipboardData(text: label)),
           borderRadius: BorderRadius.circular(4),
           child: Icon(Icons.copy_outlined, size: 14, color: colors.textHint),
         ),

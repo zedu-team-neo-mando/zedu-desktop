@@ -13,6 +13,10 @@ class ChatHistoryNotifier extends ChangeNotifier {
   int page = 1;
   bool _isHistoryClearedLocally = false;
 
+  /// Set when loading history fails, so the chat can show an error and a
+  /// Retry button instead of a blank screen. Cleared on the next attempt.
+  String? loadError;
+
   String? editingMessageId;
   final Map<String, Future<void>> _saveEditChains = {};
 
@@ -62,18 +66,37 @@ class ChatHistoryNotifier extends ChangeNotifier {
   }
 
   Future<void> _loadInitial() async {
+    var loaded = false;
     try {
       final repository = ref.read(dmRepositoryProvider);
       messages = await repository.getMessages(channelId, page: 1);
       hasMore = messages.length >= DmRepository.pageSize;
       page = 1;
+      loadError = null;
+      loaded = true;
     } catch (_) {
+      loadError = 'Could not load messages.';
     } finally {
       isLoading = false;
       notifyListeners();
     }
-    // Start polling for new messages now that the initial load is done.
-    _startPolling();
+    // Start polling once history has loaded, so the first poll does not
+    // treat the whole history as new messages.
+    if (loaded && _pollingTimer == null) _startPolling();
+  }
+
+  /// Retries after a failed load: the first page if nothing has loaded yet,
+  /// otherwise the next page of older messages.
+  Future<void> retry() async {
+    if (isLoading) return;
+    if (messages.isNotEmpty) {
+      loadError = null;
+      return loadMore();
+    }
+    isLoading = true;
+    loadError = null;
+    notifyListeners();
+    await _loadInitial();
   }
 
   // ── Realtime notification polling ────────────────────────────────────────────
@@ -172,7 +195,9 @@ class ChatHistoryNotifier extends ChangeNotifier {
       messages = [...messages, ...newMessages.where((m) => !_isDeleted(m))];
       hasMore = newMessages.length >= DmRepository.pageSize;
       page = nextPage;
+      loadError = null;
     } catch (_) {
+      loadError = 'Could not load older messages.';
     } finally {
       isLoading = false;
       notifyListeners();

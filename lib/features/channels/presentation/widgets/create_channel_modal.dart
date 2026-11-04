@@ -121,6 +121,7 @@ class _CreateChannelModalState extends ConsumerState<CreateChannelModal> {
             TextField(
               controller: _descController,
               decoration: InputDecoration(
+                hintText: 'Describe what this channel is for',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -143,6 +144,7 @@ class _CreateChannelModalState extends ConsumerState<CreateChannelModal> {
             TextField(
               controller: _topicController,
               decoration: InputDecoration(
+                hintText: 'e.g. Weekly project updates',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),

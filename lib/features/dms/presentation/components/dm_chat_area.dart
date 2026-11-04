@@ -333,7 +333,26 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                                   ),
                                 ),
                               ),
-                            if (!historyState.hasMore)
+                            if (!historyState.isLoading &&
+                                historyState.loadError != null)
+                              messages.isEmpty
+                                  ? SliverFillRemaining(
+                                      hasScrollBody: false,
+                                      child: Center(
+                                        child: _HistoryLoadError(
+                                          message: historyState.loadError!,
+                                          onRetry: historyState.retry,
+                                        ),
+                                      ),
+                                    )
+                                  : SliverToBoxAdapter(
+                                      child: _HistoryLoadError(
+                                        message: historyState.loadError!,
+                                        onRetry: historyState.retry,
+                                      ),
+                                    ),
+                            if (!historyState.hasMore &&
+                                historyState.loadError == null)
                               SliverToBoxAdapter(
                                 child: isOwnSpace
                                     ? OwnSpaceIntro(
@@ -1028,8 +1047,10 @@ class _MessageBubble extends ConsumerWidget {
                             : colors.onPrimary.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(8),
                       ),
+                      // DM history comes from the threads route, where messages
+                      // sent from Zedu web are HTML; convert them to Markdown.
                       child: _buildMessageText(
-                        content,
+                        DmMessageBody.toMarkdown(content),
                         TextStyle(
                           color: isMe ? Colors.white : colors.textPrimary,
                           fontSize: 14,
@@ -1291,6 +1312,33 @@ class _OwnMessageMenuState extends State<_OwnMessageMenu> {
             Flexible(child: widget.child),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _HistoryLoadError extends StatelessWidget {
+  const _HistoryLoadError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: colors.textHint, fontSize: 13),
+          ),
+          const SizedBox(height: 8),
+          TextButton(onPressed: onRetry, child: const Text('Retry')),
+        ],
       ),
     );
   }

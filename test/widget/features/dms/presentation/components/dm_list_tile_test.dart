@@ -235,4 +235,25 @@ void main() {
       expect(find.text('2/4/2026'), findsOneWidget);
     });
   });
+
+  testWidgets('shows an HTML preview as plain text', (tester) async {
+    await tester.pumpWidget(
+      buildTileUnderTest(
+        buildConversation(
+          previewMessage: '<p>Tom &amp; <strong>Jerry</strong></p>',
+        ),
+      ),
+    );
+
+    expect(find.text('Tom & Jerry'), findsOneWidget);
+    expect(find.textContaining('<p>'), findsNothing);
+  });
+
+  testWidgets('shows a plain-text preview unchanged', (tester) async {
+    await tester.pumpWidget(
+      buildTileUnderTest(buildConversation(previewMessage: 'see you tomorrow')),
+    );
+
+    expect(find.text('see you tomorrow'), findsOneWidget);
+  });
 }

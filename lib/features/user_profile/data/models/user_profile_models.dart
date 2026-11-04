@@ -48,6 +48,7 @@ class ProfileAccountModel extends ProfileAccount {
           json['name_pronunciation'] as String? ??
           '',
       country: json['country'] as String? ?? '',
+
     );
   }
   Map<String, dynamic> toJson() => {
