@@ -128,7 +128,10 @@ class AuthNotifier extends Notifier<AuthState> {
       if (changedSession) _resetSessionData();
     });
 
-    _interceptor.onUnauthorized = () {
+    void onUnauthorized() {
+      // The interceptor outlives this notifier, so a 401 that arrives after
+      // disposal must not touch the disposed state.
+      if (_disposed) return;
       AppLogger.w('Unauthorized — clearing session', tag: _tag);
       // Only a session that was signed in expired: a 401 from a login attempt
       // or a session restore is not one, and further 401s from requests that
@@ -140,7 +143,15 @@ class AuthNotifier extends Notifier<AuthState> {
         status: AuthStatus.unauthenticated,
         sessionExpired: wasSignedIn,
       );
-    };
+    }
+
+    _interceptor.onUnauthorized = onUnauthorized;
+    ref.onDispose(() {
+      // Leave a newer notifier's callback alone.
+      if (identical(_interceptor.onUnauthorized, onUnauthorized)) {
+        _interceptor.onUnauthorized = null;
+      }
+    });
     _restoreSession();
     return const AuthState(status: AuthStatus.unknown);
   }

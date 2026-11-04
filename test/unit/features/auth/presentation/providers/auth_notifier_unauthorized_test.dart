@@ -106,6 +106,34 @@ void main() {
       expect(container.read(authNotifierProvider).sessionExpired, isFalse);
     });
 
+    test('disposing the notifier unregisters its 401 callback', () async {
+      await signIn();
+      expect(interceptor.onUnauthorized, isNotNull);
+
+      container.dispose();
+
+      expect(interceptor.onUnauthorized, isNull);
+    });
+
+    test('a 401 that arrives after disposal is ignored', () async {
+      await signIn();
+      final late401 = interceptor.onUnauthorized!;
+
+      container.dispose();
+
+      expect(late401, returnsNormally);
+    });
+
+    test('disposal keeps a newer notifier\'s callback', () async {
+      await signIn();
+      void newer() {}
+      interceptor.onUnauthorized = newer;
+
+      container.dispose();
+
+      expect(interceptor.onUnauthorized, same(newer));
+    });
+
     test('logging out is not flagged as an expired session', () async {
       await signIn();
 
