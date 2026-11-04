@@ -1,13 +1,13 @@
-import 'package:flutter/widgets.dart';
+import 'package:zedu/core/core.dart';
 
-/// The first character a person sees in [text], uppercased, for an avatar
-/// initial. Returns [fallback] when [text] is null or blank.
+/// The first character of [name] for an avatar, upper-cased, or [fallback]
+/// when there is none.
 ///
-/// This takes a whole user-perceived character, not `text[0]`: that is one
-/// UTF-16 code unit, which cuts an emoji, a flag or an accented letter in
-/// half and renders a broken glyph.
-String firstCharacter(String? text, {String fallback = '?'}) {
-  final trimmed = text?.trim() ?? '';
+/// It takes a whole character (a grapheme), so a name that starts with an
+/// emoji, a flag or another non-BMP character isn't cut in half the way
+/// `name[0]` cuts it.
+String avatarInitial(String? name, {String fallback = '?'}) {
+  final trimmed = name?.trim() ?? '';
   if (trimmed.isEmpty) return fallback;
   return trimmed.characters.first.toUpperCase();
 }

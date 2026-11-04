@@ -13,7 +13,8 @@ class RolesAndPermissionsSection extends StatelessWidget {
       children: [
         const ProfileSectionHeader(
           title: 'Roles & permissions',
-          subtitle: 'Define and manage roles and their associated permissions.',
+          subtitle:
+              'Define and manage roles, then assign their associated permissions.',
         ),
         const SizedBox(height: 28),
         for (final role in roles) ...[

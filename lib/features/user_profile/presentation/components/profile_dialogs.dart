@@ -54,14 +54,44 @@ Future<void> showEditAccountDialog(
 
   await showDialog<void>(
     context: context,
-    builder: (ctx) => _KeepsControllers(
-      controllers: [nameCtrl, emailCtrl, timezoneCtrl],
-      child: AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text(
-          'Edit Account',
-          style: ctx.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w700,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      title: Text(
+        'Edit Account',
+        style: ctx.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+      ),
+      content: SizedBox(
+        width: 480,
+        child: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppTextField(
+                label: 'Name',
+                controller: nameCtrl,
+                hint: 'Enter your full name',
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Name is required' : null,
+              ),
+              const SizedBox(height: 16),
+              AppTextField(
+                label: 'Email Address',
+                controller: emailCtrl,
+                hint: 'Enter your email',
+                keyboardType: TextInputType.emailAddress,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Email is required';
+                  return Validators.validateEmail(context, v.trim());
+                },
+              ),
+              const SizedBox(height: 16),
+              AppTextField(
+                label: 'Timezone',
+                controller: timezoneCtrl,
+                hint: 'e.g. Africa/Lagos',
+              ),
+            ],
           ),
         ),
         content: SizedBox(
@@ -130,101 +160,196 @@ Future<void> showEditAccountDialog(
   );
 }
 
-/// Dialog for changing password.
+/// Dialog for changing password. It stays open while [onSave] runs and closes
+/// only when [onSave] succeeds; a failure is shown in the dialog.
 Future<void> showChangePasswordDialog(
   BuildContext context,
-  Future<void> Function({
+  Future<Result<void>> Function({
     required String currentPassword,
     required String newPassword,
   })
   onSave,
-) async {
-  final currentCtrl = TextEditingController();
-  final newCtrl = TextEditingController();
-  final confirmCtrl = TextEditingController();
-  final formKey = GlobalKey<FormState>();
-  bool hasAttemptedSubmit = false;
-
-  await showDialog<void>(
+) {
+  return showDialog<void>(
     context: context,
-    builder: (ctx) => _KeepsControllers(
-      controllers: [currentCtrl, newCtrl, confirmCtrl],
-      child: StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+    builder: (_) => _ChangePasswordDialog(onSave: onSave),
+  );
+}
+
+class _ChangePasswordDialog extends StatefulWidget {
+  const _ChangePasswordDialog({required this.onSave});
+
+  final Future<Result<void>> Function({
+    required String currentPassword,
+    required String newPassword,
+  })
+  onSave;
+
+  @override
+  State<_ChangePasswordDialog> createState() => _ChangePasswordDialogState();
+}
+
+class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
+  final _currentCtrl = TextEditingController();
+  final _newCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  bool _hasAttemptedSubmit = false;
+  bool _isSubmitting = false;
+  String? _submitError;
+
+  @override
+  void dispose() {
+    _currentCtrl.dispose();
+    _newCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    setState(() => _hasAttemptedSubmit = true);
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    setState(() {
+      _isSubmitting = true;
+      _submitError = null;
+    });
+    final result = await widget.onSave(
+      currentPassword: _currentCtrl.text,
+      newPassword: _newCtrl.text,
+    );
+    if (!mounted) return;
+    setState(() {
+      _isSubmitting = false;
+      if (result case Failure(:final error)) {
+        _submitError = error.friendlyMessage;
+      }
+    });
+    if (result is Success) Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      // The dialog closes only once the request has finished.
+      canPop: !_isSubmitting,
+      child: AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text(
+          'Change password',
+          style: context.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
           ),
-          title: Text(
-            'Change password',
-            style: ctx.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          content: SizedBox(
-            width: 480,
-            child: SingleChildScrollView(
-              child: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    AppTextField(
-                      label: 'Current Password',
-                      controller: currentCtrl,
-                      hint: 'Enter current password',
-                      isPassword: true,
-                      validator: (v) =>
-                          (v == null || v.isEmpty) ? 'Required' : null,
-                    ),
-                    const SizedBox(height: 16),
-                    AppTextField(
-                      label: 'New Password',
-                      controller: newCtrl,
-                      hint: 'Enter new password',
-                      isPassword: true,
-                      onChanged: (_) {
-                        setDialogState(() {});
-                        if (hasAttemptedSubmit) {
-                          formKey.currentState?.validate();
-                        }
-                      },
-                      validator: (v) => Validators.validatePassword(ctx, v),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Password requirements',
-                      style: ctx.textTheme.bodySmall?.copyWith(
-                        color: ctx.colors.textSecondary,
-                        fontWeight: FontWeight.w600,
+        ),
+        content: SizedBox(
+          width: 480,
+          child: SingleChildScrollView(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AppTextField(
+                    label: 'Current Password',
+                    controller: _currentCtrl,
+                    hint: 'Enter current password',
+                    isPassword: true,
+                    validator: (v) =>
+                        (v == null || v.isEmpty) ? 'Required' : null,
+                  ),
+                  if (_submitError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        _submitError!,
+                        style: context.textTheme.bodySmall?.copyWith(
+                          color: context.colors.error,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    ...Validators.passwordRequirements(newCtrl.text).map(
-                      (requirement) => Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(
-                              requirement.isMet
-                                  ? Icons.check_circle
-                                  : Icons.circle_outlined,
-                              size: 16,
-                              color: requirement.isMet
-                                  ? ctx.colors.primary
-                                  : ctx.colors.textSecondary,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                requirement.label,
-                                style: ctx.textTheme.bodySmall?.copyWith(
-                                  color: ctx.colors.textSecondary,
-                                ),
+                  const SizedBox(height: 16),
+                  AppTextField(
+                    label: 'New Password',
+                    controller: _newCtrl,
+                    hint: 'Enter new password',
+                    isPassword: true,
+                    onChanged: (_) {
+                      setState(() {});
+                      if (_hasAttemptedSubmit) {
+                        _formKey.currentState?.validate();
+                      }
+                    },
+                    validator: (v) => Validators.validatePassword(context, v),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Password requirements',
+                    style: context.textTheme.bodySmall?.copyWith(
+                      color: context.colors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ...Validators.passwordRequirements(_newCtrl.text).map(
+                    (requirement) => Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            requirement.isMet
+                                ? Icons.check_circle
+                                : Icons.circle_outlined,
+                            size: 16,
+                            color: requirement.isMet
+                                ? context.colors.primary
+                                : context.colors.textSecondary,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              requirement.label,
+                              style: context.textTheme.bodySmall?.copyWith(
+                                color: context.colors.textSecondary,
                               ),
                             ),
-                          ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  AppTextField(
+                    label: 'Confirm New Password',
+                    controller: _confirmCtrl,
+                    hint: 'Re-enter new password',
+                    isPassword: true,
+                    onChanged: (_) {
+                      setState(() {});
+                      if (_hasAttemptedSubmit) {
+                        _formKey.currentState?.validate();
+                      }
+                    },
+                    validator: (v) {
+                      if (v == null || v.isEmpty) {
+                        return 'Please confirm your new password';
+                      }
+                      if (v != _newCtrl.text) {
+                        return 'Passwords do not match';
+                      }
+                      return null;
+                    },
+                  ),
+                  if (!_hasAttemptedSubmit &&
+                      _confirmCtrl.text.isNotEmpty &&
+                      _confirmCtrl.text != _newCtrl.text)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Passwords do not match',
+                        style: context.textTheme.bodySmall?.copyWith(
+                          color: context.colors.textSecondary,
                         ),
                       ),
                     ),
@@ -267,34 +392,23 @@ Future<void> showChangePasswordDialog(
               ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            AppButton(
-              label: 'Update Password',
-              expand: false,
-              height: 40,
-              onPressed: () async {
-                setDialogState(() {
-                  hasAttemptedSubmit = true;
-                });
-
-                if (formKey.currentState?.validate() ?? false) {
-                  Navigator.pop(ctx);
-                  await onSave(
-                    currentPassword: currentCtrl.text,
-                    newPassword: newCtrl.text,
-                  );
-                }
-              },
-            ),
-          ],
         ),
+        actions: [
+          TextButton(
+            onPressed: _isSubmitting ? null : () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          AppButton(
+            label: 'Update Password',
+            expand: false,
+            height: 40,
+            loading: _isSubmitting,
+            onPressed: _submit,
+          ),
+        ],
       ),
-    ),
-  );
+    );
+  }
 }
 
 /// Dialog for editing organization information.
@@ -399,10 +513,52 @@ Future<void> showInviteMemberDialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          title: Text(
-            'Invite Team Member',
-            style: ctx.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
+        ),
+        content: SizedBox(
+          width: 480,
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppTextField(
+                  label: 'Email Address',
+                  controller: emailCtrl,
+                  hint: 'Enter email address',
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Email is required';
+                    }
+                    return Validators.validateEmail(context, v.trim());
+                  },
+                ),
+                const SizedBox(height: 16),
+                ProfileFieldLabel('Role'),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  initialValue: role,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 14,
+                    ),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'Administrator',
+                      child: Text('Administrator'),
+                    ),
+                    DropdownMenuItem(value: 'Manager', child: Text('Manager')),
+                    DropdownMenuItem(value: 'User', child: Text('User')),
+                  ],
+                  onChanged: (v) => setDialogState(() => role = v ?? 'User'),
+                ),
+              ],
             ),
           ),
           content: SizedBox(

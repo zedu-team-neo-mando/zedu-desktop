@@ -16,8 +16,11 @@ class OrganizationProfile {
   String get initials {
     final words = name.trim().split(RegExp(r'\s+'));
     if (words.isEmpty || words.first.isEmpty) return 'ZO';
-    if (words.length == 1) return firstCharacter(words.first);
-    return '${firstCharacter(words.first)}${firstCharacter(words.last)}';
+    // Whole characters (characters.first), so names that start with an emoji
+    // or another non-BMP character aren't cut in half.
+    if (words.length == 1) return words.first.characters.first.toUpperCase();
+    return '${words.first.characters.first}${words.last.characters.first}'
+        .toUpperCase();
   }
 
   OrganizationProfile copyWith({
