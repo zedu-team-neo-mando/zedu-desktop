@@ -4,6 +4,7 @@ enum AppToastType { success, error, info }
 
 class AppToastService {
   static OverlayEntry? _current;
+  static VoidCallback? _currentRemover;
 
   static void show(
     BuildContext context, {
@@ -42,10 +43,22 @@ class AppToastService {
     required AppToastType type,
     required String message,
   }) {
-    _current?.remove();
+    _currentRemover?.call();
     _current = null;
+    _currentRemover = null;
 
     late OverlayEntry entry;
+    var removed = false;
+    void removeEntry() {
+      if (removed) return;
+      removed = true;
+      entry.remove();
+      if (_current == entry) {
+        _current = null;
+        _currentRemover = null;
+      }
+    }
+
     entry = OverlayEntry(
       builder: (ctx) {
         final mq = MediaQuery.of(ctx);
@@ -59,15 +72,20 @@ class AppToastService {
             type: type,
             message: message,
             scale: scale,
-            onDismiss: () {
-              entry.remove();
-              if (_current == entry) _current = null;
+            onDismiss: removeEntry,
+            onDisposed: () {
+              removed = true;
+              if (_current == entry) {
+                _current = null;
+                _currentRemover = null;
+              }
             },
           ),
         );
       },
     );
     _current = entry;
+    _currentRemover = removeEntry;
     overlay.insert(entry);
   }
 }
@@ -78,12 +96,14 @@ class _AppToastWidget extends StatefulWidget {
     required this.message,
     required this.scale,
     required this.onDismiss,
+    required this.onDisposed,
   });
 
   final AppToastType type;
   final String message;
   final double scale;
   final VoidCallback onDismiss;
+  final VoidCallback onDisposed;
 
   @override
   State<_AppToastWidget> createState() => _AppToastWidgetState();
@@ -121,6 +141,7 @@ class _AppToastWidgetState extends State<_AppToastWidget>
   @override
   void dispose() {
     _controller.dispose();
+    widget.onDisposed();
     super.dispose();
   }
 
