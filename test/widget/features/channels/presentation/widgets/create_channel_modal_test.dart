@@ -63,6 +63,13 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    // AppToastService auto-dismisses on a 4s timer; let it fire before the
+    // test ends so no timer is left pending.
+    Future<void> drainToastTimer(WidgetTester tester) async {
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pumpAndSettle();
+    }
+
     testWidgets('shows the server message when creating fails', (tester) async {
       await openModal(tester);
 
@@ -121,6 +128,25 @@ void main() {
       await submit(tester);
 
       expect(find.text('Create a channel'), findsNothing);
+      await drainToastTimer(tester);
+    });
+
+    testWidgets('confirms the creation with a success toast', (tester) async {
+      await openModal(tester);
+      notifier.result = Success<Channel>(
+        Channel(
+          id: 'c1',
+          name: 'general',
+          description: '',
+          organisationId: 'org-1',
+          ownerId: 'user-1',
+        ),
+      );
+
+      await submit(tester);
+
+      expect(find.text('Channel created'), findsOneWidget);
+      await drainToastTimer(tester);
     });
 
     testWidgets('asks for a name when Create is tapped with none', (

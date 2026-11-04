@@ -304,16 +304,12 @@ class SidebarPopoutCard extends ConsumerWidget {
   Widget _row(BuildContext context, _PopoutRowData data) {
     final colors = context.colors;
     final status = data.$4;
-    final trimmed = data.$1.trim();
-    final initial = trimmed.isNotEmpty
-        ? trimmed.characters.first.toUpperCase()
-        : '?';
     final fallback = Container(
       width: _avatarSize,
       height: _avatarSize,
       color: context.colors.primary,
       alignment: Alignment.center,
-      child: Text(initial, style: _w600(colors.onPrimary, 14)),
+      child: Text(avatarInitial(data.$1), style: _w600(colors.onPrimary, 14)),
     );
     return ListTile(
       contentPadding: EdgeInsets.zero,

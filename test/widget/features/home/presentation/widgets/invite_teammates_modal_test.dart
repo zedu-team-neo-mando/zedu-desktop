@@ -115,6 +115,33 @@ Future<void> openModal(WidgetTester tester) async {
 }
 
 void main() {
+  for (final entry in {
+    1: 'Successfully invited 1 teammate.',
+    2: 'Successfully invited 2 teammates.',
+  }.entries) {
+    testWidgets('invitation success copy for ${entry.key} recipients', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        buildModalUnderTest(
+          () async => const AddEveryoneNobodyToAdd('general'),
+        ),
+      );
+      await openModal(tester);
+
+      for (var i = 0; i < entry.key; i++) {
+        await tester.enterText(find.byType(TextField), 'person$i@example.com');
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pump();
+      }
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Add'));
+      await tester.pumpAndSettle();
+
+      expect(find.text(entry.value), findsOneWidget);
+      expect(find.byType(InviteTeammatesModal), findsNothing);
+    });
+  }
+
   testWidgets('shows the invite hint without a leading pipe', (tester) async {
     await tester.pumpWidget(
       buildModalUnderTest(() async => const AddEveryoneNobodyToAdd('general')),

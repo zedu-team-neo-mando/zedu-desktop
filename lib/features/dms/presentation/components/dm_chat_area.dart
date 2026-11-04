@@ -1,6 +1,8 @@
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
+import 'composer/composer.dart';
+
 class DmChatArea extends ConsumerStatefulWidget {
   final DmConversation conversation;
 
@@ -117,14 +119,16 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
         final confirmed = await _confirmConversationAction(
           title: 'Clear history?',
           message:
-              'Clear the loaded message history for ${conversation.displayName}?',
+              'Clear the message history with ${conversation.displayName} on '
+              'this device? ${conversation.displayName} can still see it, and '
+              'new messages will still appear.',
           confirmLabel: 'Clear history',
         );
         if (confirmed && mounted) {
           ref
               .read(chatHistoryProvider(conversation.channelId))
               .clearLocalHistory();
-          _showActionNotice('Loaded history cleared locally.');
+          _showActionNotice('History cleared on this device.');
         }
       case 'delete_conversation':
         final confirmed = await _confirmConversationAction(
@@ -330,7 +334,9 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                               ),
                             if (!historyState.hasMore)
                               SliverToBoxAdapter(
-                                child: isOwnSpace
+                                child: historyState.historyCleared
+                                    ? const _HistoryClearedNote()
+                                    : isOwnSpace
                                     ? OwnSpaceIntro(
                                         conversation: widget.conversation,
                                         onEditProfile: _editOwnProfile,
@@ -487,6 +493,25 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                 ),
               ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown at the top of a cleared conversation instead of [DmProfileCard],
+/// which is meant for the real start of a conversation.
+class _HistoryClearedNote extends StatelessWidget {
+  const _HistoryClearedNote();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: Center(
+        child: Text(
+          'History cleared on this device',
+          style: TextStyle(color: context.colors.textHint, fontSize: 12),
         ),
       ),
     );
@@ -797,74 +822,7 @@ class _MessageBubble extends ConsumerWidget {
     String text,
     TextStyle defaultStyle,
     MessageLinks links,
-  ) {
-    if (text.isEmpty) return TextSpan(style: defaultStyle, text: '');
-
-    final boldRegex = RegExp(r'\*\*(.*?)\*\*', dotAll: true);
-    final italicRegex = RegExp(r'(?<!\*)\*(.*?)\*(?!\*)', dotAll: true);
-    final strikeRegex = RegExp(r'~~(.*?)~~', dotAll: true);
-    final codeRegex = RegExp(r'`(.*?)`', dotAll: true);
-
-    final allPatterns = [boldRegex, italicRegex, strikeRegex, codeRegex];
-    final combined = RegExp(
-      allPatterns.map((r) => r.pattern).join('|'),
-      dotAll: true,
-    );
-
-    final spans = <TextSpan>[];
-    int lastEnd = 0;
-
-    for (final match in combined.allMatches(text)) {
-      if (match.start > lastEnd) {
-        spans.add(
-          links.span(text.substring(lastEnd, match.start), defaultStyle),
-        );
-      }
-
-      final raw = match.group(0)!;
-      if (boldRegex.hasMatch(raw)) {
-        final inner =
-            match.group(1) ?? boldRegex.firstMatch(raw)?.group(1) ?? raw;
-        spans.add(
-          links.span(inner, defaultStyle.copyWith(fontWeight: FontWeight.bold)),
-        );
-      } else if (strikeRegex.hasMatch(raw)) {
-        final inner = strikeRegex.firstMatch(raw)?.group(1) ?? raw;
-        spans.add(
-          links.span(
-            inner,
-            defaultStyle.copyWith(decoration: TextDecoration.lineThrough),
-          ),
-        );
-      } else if (codeRegex.hasMatch(raw)) {
-        final inner = codeRegex.firstMatch(raw)?.group(1) ?? raw;
-        spans.add(
-          TextSpan(
-            text: inner,
-            style: defaultStyle.copyWith(
-              fontFamily: 'monospace',
-              backgroundColor: const Color(0x1A6458F5),
-              color: const Color(0xFF6458F5),
-            ),
-          ),
-        );
-      } else if (italicRegex.hasMatch(raw)) {
-        final inner = italicRegex.firstMatch(raw)?.group(1) ?? raw;
-        spans.add(
-          links.span(inner, defaultStyle.copyWith(fontStyle: FontStyle.italic)),
-        );
-      } else {
-        spans.add(links.span(raw, defaultStyle));
-      }
-      lastEnd = match.end;
-    }
-
-    if (lastEnd < text.length) {
-      spans.add(links.span(text.substring(lastEnd), defaultStyle));
-    }
-
-    return TextSpan(style: defaultStyle, children: spans);
-  }
+  ) => buildInlineMarkdownSpan(text, defaultStyle, plainText: links.span);
 
   /// Splits [text] around Markdown thematic breaks: a line that is exactly
   /// `---` at the start of the message or after a blank line. A `---` right
@@ -958,12 +916,11 @@ class _MessageBubble extends ConsumerWidget {
     final colors = context.colors;
     final history = ref.watch(chatHistoryProvider(channelId));
     final isMe = history.isMyMessage(message);
-    final rawContent = message['content'] as String? ?? '';
+    // Web and mobile send HTML; show it as the Markdown this bubble renders.
     // A voice note or file sent without text carries an empty paragraph
-    // (`<p></p>`). Show no text bubble for it instead of the literal tags.
-    final content = rawContent.replaceAll(RegExp(r'<[^>]*>'), '').trim().isEmpty
-        ? ''
-        : rawContent;
+    // (`<p></p>`), which becomes no text bubble.
+    final text = htmlMessageToMarkdown(message['content'] as String? ?? '');
+    final content = text.trim().isEmpty ? '' : text;
     final createdAt =
         DateTime.tryParse(message['created_at']?.toString() ?? '')?.toLocal() ??
         DateTime.now();
@@ -1048,7 +1005,7 @@ class _MessageBubble extends ConsumerWidget {
                 if (content.isNotEmpty)
                   _OwnMessageMenu(
                     enabled: isMe && status == null,
-                    onEdit: () => onEdit(messageId, rawContent),
+                    onEdit: () => onEdit(messageId, content),
                     onDelete: () => _confirmDelete(context, ref, messageId),
                     child: Container(
                       padding: const EdgeInsets.symmetric(

@@ -14,7 +14,6 @@ class IncomingCallModal extends ConsumerWidget {
     }
 
     final colors = context.colors;
-    final trimmedName = activeCall.state.remoteUserName?.trim() ?? '';
 
     return Positioned(
       top: 24,
@@ -55,9 +54,7 @@ class IncomingCallModal extends ConsumerWidget {
                         activeCall.state.remoteAvatarUrl == null ||
                             activeCall.state.remoteAvatarUrl!.isEmpty
                         ? Text(
-                            trimmedName.isNotEmpty
-                                ? trimmedName.characters.first.toUpperCase()
-                                : '?',
+                            avatarInitial(activeCall.state.remoteUserName),
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,

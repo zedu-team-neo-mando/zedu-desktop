@@ -49,7 +49,13 @@ class _CreateChannelModalState extends ConsumerState<CreateChannelModal> {
     if (!mounted) return;
     switch (result) {
       case Success<Channel>():
+        final overlay = Overlay.of(context, rootOverlay: true);
         Navigator.of(context).pop();
+        AppToastService.showWith(
+          overlay,
+          type: AppToastType.success,
+          message: 'Channel created',
+        );
       case Failure<Channel>(:final error):
         setState(() {
           _isCreating = false;

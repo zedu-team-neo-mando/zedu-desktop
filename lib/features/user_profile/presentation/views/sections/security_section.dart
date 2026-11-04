@@ -48,6 +48,15 @@ class _SessionsTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (sessions.isEmpty) {
+      return const ProfileCard(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 32),
+          child: Center(child: Text('No active sessions found')),
+        ),
+      );
+    }
+
     return ProfileCard(
       padding: EdgeInsets.zero,
       child: SingleChildScrollView(

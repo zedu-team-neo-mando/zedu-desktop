@@ -161,6 +161,7 @@ class _SetStatusDialogState extends ConsumerState<SetStatusDialog> {
                       button: true,
                       child: InkWell(
                         onTap: _pickEmoji,
+                        mouseCursor: SystemMouseCursors.click,
                         borderRadius: const BorderRadius.horizontal(
                           left: Radius.circular(8),
                         ),
@@ -280,14 +281,17 @@ class _SetStatusDialogState extends ConsumerState<SetStatusDialog> {
                     onChanged: (v) =>
                         setState(() => _pauseNotifications = v ?? false),
                   ),
-                  GestureDetector(
-                    onTap: () => setState(
-                      () => _pauseNotifications = !_pauseNotifications,
-                    ),
-                    child: Text(
-                      'Pause notifications',
-                      style: context.textTheme.bodyMedium?.copyWith(
-                        color: colors.textPrimary,
+                  MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: () => setState(
+                        () => _pauseNotifications = !_pauseNotifications,
+                      ),
+                      child: Text(
+                        'Pause notifications',
+                        style: context.textTheme.bodyMedium?.copyWith(
+                          color: colors.textPrimary,
+                        ),
                       ),
                     ),
                   ),
@@ -389,6 +393,7 @@ class _PresetTile extends StatelessWidget {
         ),
         child: InkWell(
           onTap: onTap,
+          mouseCursor: SystemMouseCursors.click,
           borderRadius: radius,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 8),

@@ -51,6 +51,8 @@ List<DmConversation> _fullPage(String orgId, int page) => [
 ];
 
 void main() {
+  _noFakeDmTests();
+
   late _FakeDmRepository repository;
   late ProviderContainer container;
 
@@ -115,5 +117,73 @@ void main() {
 
     expect(listedIds(), _fullPage('org-a', 1).map((c) => c.channelId));
     expect(notifier.hasMore, isTrue);
+  });
+}
+
+/// Returns the same conversations for every page.
+class _ListDmRepository implements DmRepository {
+  _ListDmRepository(this.conversations);
+
+  final List<DmConversation> conversations;
+
+  @override
+  Future<List<DmConversation>> getConversations({
+    required String orgId,
+    int page = 1,
+    bool recentDm = false,
+    String? search,
+  }) async => conversations;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+void _noFakeDmTests() {
+  group('the list holds only what the API sent', () {
+    ProviderContainer containerFor(List<DmConversation> conversations) {
+      final container = ProviderContainer(
+        overrides: [
+          currentOrgIdProvider.overrideWithValue('org-1'),
+          dmRepositoryProvider.overrideWithValue(
+            _ListDmRepository(conversations),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      return container;
+    }
+
+    test('returns an empty list when the organisation has no DMs', () async {
+      final container = containerFor(const []);
+
+      final conversations = await container.read(dmListProvider.future);
+
+      expect(conversations, isEmpty);
+      expect(container.read(dmListProvider.notifier).hasMore, isFalse);
+    });
+
+    test('stays empty after a refresh that returns no DMs', () async {
+      final container = containerFor(const []);
+      await container.read(dmListProvider.future);
+
+      await container.read(dmListProvider.notifier).refresh();
+
+      expect(container.read(dmListProvider).value, isEmpty);
+    });
+
+    test('returns only the conversations the API sent', () async {
+      final real = DmConversation(
+        channelId: 'channel-1',
+        username: 'Ada',
+        participantId: 'user-1',
+        previewMessage: 'Hi',
+        unreadCount: 0,
+      );
+      final container = containerFor([real]);
+
+      final conversations = await container.read(dmListProvider.future);
+
+      expect(conversations, [real]);
+    });
   });
 }

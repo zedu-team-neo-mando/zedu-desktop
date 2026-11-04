@@ -236,6 +236,26 @@ void main() {
     });
   });
 
+  group('avatar initial', () {
+    testWidgets('skips leading whitespace in the name', (tester) async {
+      await tester.pumpWidget(
+        buildTileUnderTest(buildConversation(username: ' ada')),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('A'), findsOneWidget);
+    });
+
+    testWidgets('shows ? for a whitespace-only name', (tester) async {
+      await tester.pumpWidget(
+        buildTileUnderTest(buildConversation(username: '   ')),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('?'), findsOneWidget);
+    });
+  });
+
   group('rows for people with no conversation yet', () {
     DmConversation newDm(String participantId) => DmConversation(
       channelId: '',
