@@ -22,15 +22,20 @@ class SquareIconButton extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.size = 32,
+    this.tooltip,
   });
 
   final IconData icon;
   final VoidCallback onTap;
   final double size;
 
+  /// Hover hint and accessible name for the button, e.g. 'Edit ada@example.com'.
+  /// When null the button keeps its previous unlabelled behaviour.
+  final String? tooltip;
+
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    final button = InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(4),
       child: Container(
@@ -41,6 +46,19 @@ class SquareIconButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(4),
         ),
         child: Icon(icon, size: size * 0.56, color: const Color(0xFF374151)),
+      ),
+    );
+
+    final label = tooltip;
+    if (label == null) {
+      return button;
+    }
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        label: label,
+        child: button,
       ),
     );
   }

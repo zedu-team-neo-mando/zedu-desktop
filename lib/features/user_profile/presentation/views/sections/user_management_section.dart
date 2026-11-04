@@ -152,6 +152,7 @@ class _UserManagementSectionState extends State<UserManagementSection> {
                                 SquareIconButton(
                                   icon: Icons.edit_outlined,
                                   size: 28,
+                                  tooltip: 'Edit ${member.email}',
                                   onTap: () => _showMemberDialog(
                                     context,
                                     member,
@@ -162,6 +163,7 @@ class _UserManagementSectionState extends State<UserManagementSection> {
                                 SquareIconButton(
                                   icon: Icons.delete_outline,
                                   size: 28,
+                                  tooltip: 'Remove ${member.email}',
                                   onTap: () => _confirmRemove(
                                     context,
                                     member.email,
