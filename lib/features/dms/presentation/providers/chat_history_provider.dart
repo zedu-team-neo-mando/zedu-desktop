@@ -198,7 +198,11 @@ class ChatHistoryNotifier extends ChangeNotifier {
         page: nextPage,
       );
 
-      messages = [...messages, ...newMessages.where((m) => !_isDeleted(m))];
+      final existingIds = messages.map((m) => m['id']?.toString()).toSet();
+      final uniqueNew = newMessages.where(
+        (m) => !_isDeleted(m) && !existingIds.contains(m['id']?.toString()),
+      );
+      messages = [...messages, ...uniqueNew];
       hasMore = newMessages.length >= DmRepository.pageSize;
       page = nextPage;
     } catch (_) {
