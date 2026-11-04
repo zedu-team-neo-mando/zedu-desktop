@@ -323,41 +323,38 @@ void main() {
   });
 
   group('UserManagementSection table layout and overflow (#204)', () {
-    testWidgets(
-      'renders long email, long role, and long date without overflow',
-      (tester) async {
-        tester.view.physicalSize = const Size(800, 600);
-        tester.view.devicePixelRatio = 1.0;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
+    testWidgets('renders long email, long role, and long date without overflow', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(800, 600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-        final members = [
-          const TeamMember(
-            id: 'long-member-1',
-            email: 'verylongemailaddressthatcouldcauseoverflow@organizationdomain.com',
-            role: '019fcd17-4b53-72d3-bac3-4586dc029b5a',
-            dateJoined: 'November 28, 2026, 11:59 PM',
-            status: TeamMemberStatus.active,
-          ),
-        ];
+      final members = [
+        const TeamMember(
+          id: 'long-member-1',
+          email:
+              'verylongemailaddressthatcouldcauseoverflow@organizationdomain.com',
+          role: '019fcd17-4b53-72d3-bac3-4586dc029b5a',
+          dateJoined: 'November 28, 2026, 11:59 PM',
+          status: TeamMemberStatus.active,
+        ),
+      ];
 
-        await tester.pumpWidget(buildUnderTest(members));
-        await tester.pumpAndSettle();
+      await tester.pumpWidget(buildUnderTest(members));
+      await tester.pumpAndSettle();
 
-        expect(tester.takeException(), isNull);
-        expect(
-          find.text(
-            'verylongemailaddressthatcouldcauseoverflow@organizationdomain.com',
-          ),
-          findsOneWidget,
-        );
-        expect(
-          find.text('019fcd17-4b53-72d3-bac3-4586dc029b5a'),
-          findsOneWidget,
-        );
-        expect(find.text('November 28, 2026, 11:59 PM'), findsOneWidget);
-      },
-    );
+      expect(tester.takeException(), isNull);
+      expect(
+        find.text(
+          'verylongemailaddressthatcouldcauseoverflow@organizationdomain.com',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('019fcd17-4b53-72d3-bac3-4586dc029b5a'), findsOneWidget);
+      expect(find.text('November 28, 2026, 11:59 PM'), findsOneWidget);
+    });
 
     testWidgets('renders without overflow on narrow window dimensions', (
       tester,
