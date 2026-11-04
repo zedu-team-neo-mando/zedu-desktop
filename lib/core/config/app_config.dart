@@ -12,6 +12,9 @@ import 'package:zedu/core/core.dart';
 const String kDefaultDesktopGoogleClientId =
     '764182056638-08g88e196e643mhpa2tuv5dpr7iumd1j.apps.googleusercontent.com';
 
+/// The website's Contact Sales page, opened from the Enterprise plan.
+const String kDefaultContactSalesUrl = 'https://zedu.chat/contact-sales';
+
 /// Default Centrifugo WebSocket connection URL for real-time messaging on staging.
 const String kDefaultCentrifugoConnectUrl =
     'wss://connect.staging.zedu.chat/connection/websocket';
@@ -22,6 +25,7 @@ class AppConfig {
     required this.usesMockData,
     this.googleClientId = kDefaultDesktopGoogleClientId,
     this.googleClientSecret = '',
+    this.contactSalesUrl = kDefaultContactSalesUrl,
     this.connectUrl = kDefaultCentrifugoConnectUrl,
   });
 
@@ -93,6 +97,7 @@ class AppConfig {
   final bool usesMockData;
   final String googleClientId;
   final String googleClientSecret;
+  final String contactSalesUrl;
   final String connectUrl;
 }
 
