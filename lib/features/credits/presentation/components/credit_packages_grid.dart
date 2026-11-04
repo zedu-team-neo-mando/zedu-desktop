@@ -153,24 +153,32 @@ class CreditPackagesGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = _displayPackages;
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: items.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 20,
-        mainAxisSpacing: 20,
-        mainAxisExtent: 520, // Increased to fit the longest benefits list
-      ),
-      itemBuilder: (context, index) {
-        final package = items[index];
-        return CreditPackageCard(
-          package: package,
-          accentColor: _getColorForPackage(package.name),
-          isCurrentPlan: _isCurrentPlan(package),
-          isLoading: purchasingPackageId == package.id,
-          onPurchase: package.isFree ? null : () => onPurchase(package),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 1050
+            ? 3
+            : (constraints.maxWidth >= 700 ? 2 : 1);
+
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: items.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            crossAxisSpacing: 20,
+            mainAxisSpacing: 20,
+            mainAxisExtent: 520, // Increased to fit the longest benefits list
+          ),
+          itemBuilder: (context, index) {
+            final package = items[index];
+            return CreditPackageCard(
+              package: package,
+              accentColor: _getColorForPackage(package.name),
+              isCurrentPlan: _isCurrentPlan(package),
+              isLoading: purchasingPackageId == package.id,
+              onPurchase: package.isFree ? null : () => onPurchase(package),
+            );
+          },
         );
       },
     );
