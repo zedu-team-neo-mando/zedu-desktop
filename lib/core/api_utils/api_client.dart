@@ -13,6 +13,16 @@ class ApiBaseService {
     receiveTimeout: const Duration(seconds: 30),
   );
 
+  /// Trims leading slashes from [path] so that Dio's URI resolution does not
+  /// treat the path as root-relative and strip the path prefix of [baseUrl].
+  /// Absolute URLs (with scheme) and empty paths are preserved unchanged.
+  static String normalizePath(String path) {
+    if (path.isEmpty || Uri.tryParse(path)?.hasScheme == true) {
+      return path;
+    }
+    return path.replaceFirst(RegExp(r'^/+'), '');
+  }
+
   final Dio _dio;
 
   Future<ApiResponseModel<T>> get<T>({
@@ -106,16 +116,17 @@ class ApiBaseService {
     Map<String, dynamic>? queryParameters,
     Map<String, String>? headers,
   }) async {
+    final normalizedPath = normalizePath(path);
     try {
       // Read the body untyped: asking Dio for T lets its own cast throw a
       // TypeError before the response shape can be validated here.
       final response = await _dio.request<Object?>(
-        path,
+        normalizedPath,
         data: data,
         queryParameters: queryParameters,
         options: Options(
           method: method,
-          headers: headersForPath(path, headers: headers),
+          headers: headersForPath(normalizedPath, headers: headers),
         ),
       );
 
