@@ -1,3 +1,5 @@
+import 'package:zedu/core/core.dart';
+
 class ProfileAccount {
   const ProfileAccount({
     required this.name,
@@ -32,8 +34,8 @@ class ProfileAccount {
   String get initials {
     final parts = name.trim().split(RegExp(r'\s+'));
     if (parts.isEmpty || parts.first.isEmpty) return 'ZU';
-    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
-    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+    if (parts.length == 1) return firstCharacter(parts.first);
+    return '${firstCharacter(parts.first)}${firstCharacter(parts.last)}';
   }
 
   ProfileAccount copyWith({

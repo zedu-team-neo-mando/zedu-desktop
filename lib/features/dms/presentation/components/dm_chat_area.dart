@@ -546,9 +546,7 @@ class _DmChatHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final participantInitial = conversation.displayName.trim().isEmpty
-        ? '?'
-        : conversation.displayName.trim()[0].toUpperCase();
+    final participantInitial = firstCharacter(conversation.displayName);
 
     return Container(
       height: 58,
@@ -886,9 +884,7 @@ class _MessageBubble extends ConsumerWidget {
         ? history.currentUserAvatarUrl
         : conversation.effectiveAvatarUrl;
 
-    final senderInitial = senderName.isNotEmpty
-        ? senderName[0].toUpperCase()
-        : '?';
+    final senderInitial = firstCharacter(senderName);
 
     final List<dynamic> media = (message['media'] as List<dynamic>?) ?? [];
 

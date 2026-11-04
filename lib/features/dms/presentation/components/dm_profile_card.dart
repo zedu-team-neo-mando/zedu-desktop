@@ -91,7 +91,6 @@ class DmProfileCard extends StatelessWidget {
           if (constraints.maxWidth < narrowBreakpoint) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
                 identity,
                 const SizedBox(height: 8),
                 Padding(
@@ -129,7 +128,7 @@ class DmProfileCard extends StatelessWidget {
       backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
       child: avatarUrl == null
           ? Text(
-              name.isNotEmpty ? name[0].toUpperCase() : '?',
+              name.isNotEmpty ? firstCharacter(name) : '?',
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,

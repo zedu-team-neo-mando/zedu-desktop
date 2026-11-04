@@ -5,3 +5,4 @@ export 'validators.dart';
 export 'logger.dart';
 export 'email_mask.dart';
 export 'html_utils.dart';
+export 'initials.dart';
