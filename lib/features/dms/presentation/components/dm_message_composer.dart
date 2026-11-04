@@ -439,12 +439,15 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     return KeyEventResult.ignored;
   }
 
+  // An unfocused composer has no selection; its markers still go at the end.
+  TextSelection get _selectionOrEnd => _controller.selection.isValid
+      ? _controller.selection
+      : TextSelection.collapsed(offset: _controller.text.length);
+
   void _wrapSelection(String before, [String? after]) {
     after ??= before;
     final text = _controller.text;
-    final sel = _controller.selection;
-
-    if (!sel.isValid) return;
+    final sel = _selectionOrEnd;
 
     if (sel.isCollapsed) {
       final insert = '$before$after';
@@ -479,8 +482,7 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
 
   void _insertQuote() {
     final text = _controller.text;
-    final sel = _controller.selection;
-    if (!sel.isValid) return;
+    final sel = _selectionOrEnd;
     final selected = text.substring(sel.start, sel.end);
     // A selection that ends right after a newline leaves an empty last piece.
     // Quoting it would put "> " on the first line that is not selected.
