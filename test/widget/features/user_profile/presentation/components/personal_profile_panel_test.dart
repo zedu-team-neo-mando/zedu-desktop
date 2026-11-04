@@ -202,4 +202,34 @@ void main() {
     );
     expect(copied, 'hassanat@example.com');
   });
+
+  testWidgets('copy button on contact row copies contact info to clipboard', (
+    t,
+  ) async {
+    String? copied;
+    t.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => t.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+
+    await _pump(t);
+    final copyIcons = find.byIcon(Icons.copy_outlined);
+    await _tapAndExpectToast(
+      t,
+      copyIcons.last,
+      'Copied hassanat@example.com',
+    );
+    expect(copied, 'hassanat@example.com');
+  });
 }
