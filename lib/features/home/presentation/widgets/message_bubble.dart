@@ -45,7 +45,7 @@ class _MessageBubbleState extends State<MessageBubble> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final initial = avatarInitial(widget.author);
+    final initial = firstCharacter(widget.author);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovering = true),
@@ -262,9 +262,6 @@ class _MessageBody extends StatelessWidget {
     Widget markdownWidget = cleanText.isNotEmpty
         ? MarkdownBody(
             data: cleanText,
-            onTapLink: (_, href, _) {
-              if (href != null) openMessageLink(href);
-            },
             styleSheet: MarkdownStyleSheet(
               p: TextStyle(fontSize: 14, color: colors.textPrimary),
               strong: TextStyle(

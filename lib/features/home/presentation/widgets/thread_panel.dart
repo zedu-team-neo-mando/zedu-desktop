@@ -4,14 +4,12 @@ import 'package:zedu/features/features.dart';
 class ThreadPanel extends StatefulWidget {
   final String parentMessage;
   final String parentAuthor;
-  final String parentTimestamp;
   final VoidCallback onClose;
 
   const ThreadPanel({
     super.key,
     required this.parentMessage,
     required this.parentAuthor,
-    this.parentTimestamp = '',
     required this.onClose,
   });
 
@@ -21,20 +19,6 @@ class ThreadPanel extends StatefulWidget {
 
 class _ThreadPanelState extends State<ThreadPanel> {
   final List<String> _replies = [];
-  final TextEditingController _replyController = TextEditingController();
-
-  @override
-  void dispose() {
-    _replyController.dispose();
-    super.dispose();
-  }
-
-  void _submitReply() {
-    final reply = _replyController.text.trim();
-    if (reply.isEmpty) return;
-    setState(() => _replies.add(reply));
-    _replyController.clear();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -70,7 +54,6 @@ class _ThreadPanelState extends State<ThreadPanel> {
                   onPressed: widget.onClose,
                   icon: Icon(Icons.close, color: colors.textHint),
                   splashRadius: 20,
-                  tooltip: 'Close thread',
                 ),
               ],
             ),
@@ -82,7 +65,7 @@ class _ThreadPanelState extends State<ThreadPanel> {
                 MessageBubble(
                   author: widget.parentAuthor,
                   text: widget.parentMessage,
-                  timestamp: widget.parentTimestamp,
+                  timestamp: '3:15 PM',
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -119,7 +102,6 @@ class _ThreadPanelState extends State<ThreadPanel> {
               border: Border(top: BorderSide(color: colors.divider)),
             ),
             child: TextField(
-              controller: _replyController,
               decoration: InputDecoration(
                 hintText: 'Reply...',
                 hintStyle: TextStyle(color: colors.textHint),
@@ -139,13 +121,13 @@ class _ThreadPanelState extends State<ThreadPanel> {
                   horizontal: 12,
                   vertical: 12,
                 ),
-                suffixIcon: IconButton(
-                  tooltip: 'Send reply',
-                  onPressed: _submitReply,
-                  icon: Icon(Icons.send, color: colors.primary),
-                ),
+                suffixIcon: Icon(Icons.send, color: colors.primary),
               ),
-              onSubmitted: (_) => _submitReply(),
+              onSubmitted: (value) {
+                if (value.trim().isNotEmpty) {
+                  setState(() => _replies.add(value.trim()));
+                }
+              },
             ),
           ),
         ],

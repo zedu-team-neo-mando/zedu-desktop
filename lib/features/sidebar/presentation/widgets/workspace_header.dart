@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -30,32 +29,7 @@ class _WorkspaceSwitcherHeaderState
 
     if (selectedWorkspace == null) {
       final errorMessage = workspaceState.errorMessage;
-      if (errorMessage == null) {
-        if (workspaceState.isLoading) return const SizedBox.shrink();
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'No organization',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: colors.onPrimary.withValues(alpha: 0.8),
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: () => context.push(AppRouter.createOrganization),
-                child: Text(
-                  'Create one',
-                  style: TextStyle(color: colors.onPrimary),
-                ),
-              ),
-            ],
-          ),
-        );
-      }
+      if (errorMessage == null) return const SizedBox.shrink();
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
@@ -122,10 +96,8 @@ class _WorkspaceSwitcherHeaderState
             ),
           ),
           IconButton(
-            tooltip: 'New conversation',
             onPressed: () {
-              ref.read(selectedDmProvider.notifier).select(null);
-              ref.read(activeChatProvider.notifier).selectNewGroupChat();
+              // Add action
             },
             icon: Icon(
               Icons.add,
@@ -211,8 +183,7 @@ class _AnchoredWorkspaceMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final screenHeight = MediaQuery.sizeOf(context).height;
-    final maxHeight = math.max(120.0, screenHeight - top - 16);
+    final maxHeight = MediaQuery.sizeOf(context).height - top - 16;
 
     return Stack(
       children: [
@@ -220,7 +191,9 @@ class _AnchoredWorkspaceMenu extends StatelessWidget {
           left: left,
           top: top,
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: maxHeight),
+            constraints: BoxConstraints(
+              maxHeight: maxHeight < 0 ? 0 : maxHeight,
+            ),
             child: AnimatedBuilder(
               animation: animation,
               builder: (context, child) {

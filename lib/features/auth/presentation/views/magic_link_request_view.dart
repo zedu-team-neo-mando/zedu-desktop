@@ -13,20 +13,13 @@ class _MagicLinkRequestViewState extends ConsumerState<MagicLinkRequestView> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
 
-  late final _signUpLink = TapGestureRecognizer()
-    ..onTap = () => context.push(AppRouter.signup);
-
   @override
   void dispose() {
-    _signUpLink.dispose();
     _emailController.dispose();
     super.dispose();
   }
 
   Future<void> _onGeneratePressed() async {
-    // Enter and the button share this handler; a request already in flight must
-    // not be sent twice (e.g. Enter held down, or Enter plus a click).
-    if (ref.read(magicLinkNotifierProvider).isLoading) return;
     if (!_formKey.currentState!.validate()) return;
 
     final email = _emailController.text.trim();
@@ -101,7 +94,6 @@ class _MagicLinkRequestViewState extends ConsumerState<MagicLinkRequestView> {
                       hint: 'Enter your email',
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _onGeneratePressed(),
                       validator: (value) =>
                           Validators.validateEmail(context, value),
                     ),
@@ -125,7 +117,8 @@ class _MagicLinkRequestViewState extends ConsumerState<MagicLinkRequestView> {
                           style: context.textTheme.bodyMedium?.copyWith(
                             color: context.colors.primary,
                           ),
-                          recognizer: _signUpLink,
+                          recognizer: TapGestureRecognizer()
+                            ..onTap = () => context.push(AppRouter.signup),
                         ),
                       ],
                     ),

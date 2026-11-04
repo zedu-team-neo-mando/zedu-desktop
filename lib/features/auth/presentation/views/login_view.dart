@@ -14,12 +14,8 @@ class _LoginViewState extends ConsumerState<LoginView> {
   final _passwordController = TextEditingController();
   bool _rememberMe = false;
 
-  late final _signUpLink = TapGestureRecognizer()
-    ..onTap = () => context.push(AppRouter.signup);
-
   @override
   void dispose() {
-    _signUpLink.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -33,9 +29,7 @@ class _LoginViewState extends ConsumerState<LoginView> {
         .read(authNotifierProvider.notifier)
         .login(
           email: _emailController.text.trim(),
-          // Sent as typed: trimming would change a password that was set
-          // with a leading or trailing space.
-          password: _passwordController.text,
+          password: _passwordController.text.trim(),
           rememberMe: _rememberMe,
         );
   }
@@ -52,9 +46,7 @@ class _LoginViewState extends ConsumerState<LoginView> {
         );
         context.go(AppRouter.home);
       }
-      if (next.error != null &&
-          previous?.error != next.error &&
-          !next.sessionRestoreFailed) {
+      if (next.error != null && previous?.error != next.error) {
         AppToastService.show(
           context,
           type: AppToastType.error,
@@ -73,10 +65,6 @@ class _LoginViewState extends ConsumerState<LoginView> {
           child: CircularProgressIndicator(color: theme.colorScheme.primary),
         ),
       );
-    }
-
-    if (authState.sessionRestoreFailed) {
-      return _SessionRetryScreen(message: authState.error);
     }
 
     return Scaffold(
@@ -107,7 +95,8 @@ class _LoginViewState extends ConsumerState<LoginView> {
                         color: context.colors.primary,
                         fontFamily: FontFamily.roboto,
                       ),
-                      recognizer: _signUpLink,
+                      recognizer: TapGestureRecognizer()
+                        ..onTap = () => context.push(AppRouter.signup),
                     ),
                   ],
                 ),
@@ -286,62 +275,6 @@ class _LoginViewState extends ConsumerState<LoginView> {
                   ],
                 ),
                 context.gapV(32),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Shown instead of the login form when the saved session may still be valid
-/// but the server could not be reached to check it.
-class _SessionRetryScreen extends ConsumerWidget {
-  const _SessionRetryScreen({this.message});
-
-  final String? message;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final colors = context.colors;
-    final notifier = ref.read(authNotifierProvider.notifier);
-
-    return Scaffold(
-      backgroundColor: colors.background,
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.cloud_off, size: 40, color: colors.textHint),
-                const SizedBox(height: 16),
-                Text(
-                  "Can't reach Zedu",
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                if (message != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    message!,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: colors.textSecondary),
-                  ),
-                ],
-                const SizedBox(height: 24),
-                AppButton(
-                  label: 'Retry',
-                  onPressed: notifier.retrySessionRestore,
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: notifier.showLoginForm,
-                  child: const Text('Log in with a password instead'),
-                ),
               ],
             ),
           ),

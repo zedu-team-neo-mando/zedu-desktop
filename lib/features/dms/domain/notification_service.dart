@@ -1,47 +1,15 @@
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
-/// Shortens [text] for a notification banner: over 80 characters, it keeps the
-/// first 77 and adds "...". It counts characters as people see them (grapheme
-/// clusters), so an emoji or accented letter at the cut is never split.
-String notificationPreview(String text) {
-  final characters = text.characters;
-  if (characters.length <= 80) return text;
-  return '${characters.take(77)}...';
-}
-
 final notificationServiceProvider = Provider<NotificationService>((ref) {
   return NotificationService(ref);
 });
 
 class NotificationService {
   final Ref _ref;
-  final GoRouter? _router;
-  final Future<void> Function()? _bringToFront;
-  final Future<bool> Function()? _isFocused;
   final Map<String, DateTime> _lastNotificationTimes = {};
 
-  NotificationService(
-    this._ref, [
-    this._router,
-    this._bringToFront,
-    this._isFocused,
-  ]);
-
-  static Future<void> _defaultBringToFront() async {
-    try {
-      await windowManager.show();
-      await windowManager.focus();
-    } catch (_) {}
-  }
-
-  static Future<bool> _defaultIsFocused() async {
-    try {
-      return await windowManager.isFocused();
-    } catch (_) {
-      return false;
-    }
-  }
+  NotificationService(this._ref);
 
   Future<void> init() async {
     await localNotifier.setup(
@@ -73,7 +41,7 @@ class NotificationService {
     if (settings.isMuted(senderId)) return;
 
     if (!forceShow) {
-      final isFocused = await (_isFocused?.call() ?? _defaultIsFocused());
+      final isFocused = await windowManager.isFocused();
       final selectedChannel = _ref.read(selectedDmProvider)?.channelId;
 
       if (isFocused && selectedChannel == channelId) {
@@ -98,71 +66,23 @@ class NotificationService {
       }
     }
 
-    contentPreview = notificationPreview(contentPreview);
+    if (contentPreview.length > 80) {
+      contentPreview = '${contentPreview.substring(0, 77)}...';
+    }
 
     final notification = LocalNotification(
       title: 'New DM from $senderName',
       body: contentPreview,
     );
 
-    notification.onClick = () => handleNotificationClick(
-      channelId: channelId,
-      senderName: senderName,
-      senderId: senderId,
-      contentPreview: contentPreview,
-    );
+    notification.onClick = () async {
+      await windowManager.show();
+      await windowManager.focus();
 
-    try {
-      await notification.show();
-    } catch (_) {}
-  }
+      final router = locator<GoRouter>();
+      router.go('/dms/$channelId');
+    };
 
-  /// Handles a user clicking on a desktop notification.
-  ///
-  /// Selects the DM conversation via [selectedDmProvider], switches the
-  /// sidebar to [HomeSidebarType.dms], and navigates to [AppRouter.home]
-  /// if not already on the home screen.
-  Future<void> handleNotificationClick({
-    required String channelId,
-    required String senderName,
-    required String senderId,
-    required String contentPreview,
-  }) async {
-    await (_bringToFront?.call() ?? _defaultBringToFront());
-
-    _ref.read(homeSidebarProvider.notifier).setType(HomeSidebarType.dms);
-
-    final conversations = _ref.read(dmListProvider).value ?? const [];
-    DmConversation? conversation;
-    for (final c in conversations) {
-      if (c.channelId == channelId) {
-        conversation = c;
-        break;
-      }
-    }
-    conversation ??= DmConversation(
-      channelId: channelId,
-      username: senderName,
-      participantId: senderId,
-      previewMessage: contentPreview,
-      unreadCount: 0,
-    );
-
-    _ref.read(selectedDmProvider.notifier).select(conversation);
-
-    final router =
-        _router ??
-        (locator.isRegistered<GoRouter>()
-            ? locator<GoRouter>()
-            : AppRouter.router);
-
-    try {
-      final location = router.routerDelegate.currentConfiguration.uri;
-      if (location.path != AppRouter.home) {
-        router.go(AppRouter.home);
-      }
-    } catch (_) {
-      router.go(AppRouter.home);
-    }
+    await notification.show();
   }
 }

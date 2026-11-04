@@ -1,4 +1,3 @@
-export 'data/data.dart';
 export 'presentation/providers/active_chat_provider.dart';
 export 'presentation/providers/group_dm_provider.dart';
 export 'presentation/views/new_group_chat_view.dart';
@@ -11,4 +10,3 @@ export 'presentation/widgets/search_panel.dart';
 export 'presentation/widgets/group_details_panel.dart';
 export 'presentation/widgets/invite_teammates_modal.dart';
 export 'presentation/presentation.dart';
-export 'data/models/user_mention_activity_model.dart';

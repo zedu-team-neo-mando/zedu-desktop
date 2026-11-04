@@ -94,10 +94,11 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
     if (!_addEmailFromInput()) return;
 
     if (_invites.isEmpty) {
-      AppToastService.show(
-        context,
-        type: AppToastType.error,
-        message: 'Please enter at least one email address.',
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please enter at least one email address.'),
+          backgroundColor: context.colors.error,
+        ),
       );
       return;
     }
@@ -131,9 +132,7 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
     if (successCount > 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Successfully invited $successCount ${successCount == 1 ? 'teammate' : 'teammates'}.',
-          ),
+          content: Text('Successfully invited $successCount teammates.'),
           backgroundColor: context.colors.success,
         ),
       );
@@ -142,10 +141,11 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
       setState(() {
         _isLoading = false;
       });
-      AppToastService.show(
-        context,
-        type: AppToastType.error,
-        message: lastError,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(lastError),
+          backgroundColor: context.colors.error,
+        ),
       );
     }
   }
@@ -156,28 +156,30 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
     if (!mounted) return;
     setState(() => _isAddingEveryone = false);
 
+    final colors = context.colors;
+    final messenger = ScaffoldMessenger.of(context);
     switch (result) {
       case AddEveryoneAdded(:final count, :final channelName):
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text(
               'Added $count ${count == 1 ? 'person' : 'people'} to #$channelName.',
             ),
-            backgroundColor: context.colors.success,
+            backgroundColor: colors.success,
           ),
         );
         Navigator.pop(context);
       case AddEveryoneNobodyToAdd(:final channelName):
-        AppToastService.show(
-          context,
-          type: AppToastType.info,
-          message: 'Everyone in your organisation is already in #$channelName.',
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              'Everyone in your organisation is already in #$channelName.',
+            ),
+          ),
         );
       case AddEveryoneFailed(:final message):
-        AppToastService.show(
-          context,
-          type: AppToastType.error,
-          message: message,
+        messenger.showSnackBar(
+          SnackBar(content: Text(message), backgroundColor: colors.error),
         );
     }
   }
@@ -215,7 +217,6 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
                 const SizedBox(width: 12),
                 IconButton(
                   icon: Icon(Icons.close, color: colors.textHint),
-                  tooltip: 'Close invitation dialog',
                   onPressed: () => Navigator.pop(context),
                   splashRadius: 20,
                   padding: EdgeInsets.zero,
@@ -266,7 +267,9 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
                     child: TextField(
                       controller: _emailController,
                       decoration: InputDecoration(
-                        hintText: _invites.isEmpty ? 'Enter name or email' : '',
+                        hintText: _invites.isEmpty
+                            ? '|Enter name or email'
+                            : '',
                         hintStyle: TextStyle(
                           color: colors.textHint.withValues(alpha: 0.7),
                         ),
@@ -374,10 +377,11 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
                             );
                           }
                         } else if (context.mounted) {
-                          AppToastService.show(
-                            context,
-                            type: AppToastType.error,
-                            message: 'Failed to generate link',
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text('Failed to generate link'),
+                              backgroundColor: colors.error,
+                            ),
                           );
                         }
                       },

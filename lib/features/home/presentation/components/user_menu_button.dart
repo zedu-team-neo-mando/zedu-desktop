@@ -13,9 +13,7 @@ class UserMenuButton extends ConsumerWidget {
       onTap: () {
         showDialog<void>(
           context: context,
-          // The card is anchored beside the rail, so it must not dim the whole
-          // window: a transparent barrier still closes it on an outside tap.
-          barrierColor: Colors.transparent,
+          barrierColor: Colors.black.withValues(alpha: 0.3),
           builder: (context) => const UserMenuDialog(),
         );
       },

@@ -21,41 +21,26 @@ class SquareIconButton extends StatelessWidget {
     super.key,
     required this.icon,
     required this.onTap,
-    required this.tooltip,
     this.size = 32,
   });
 
   final IconData icon;
   final VoidCallback onTap;
-  final String tooltip;
   final double size;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      container: true,
-      button: true,
-      label: tooltip,
-      child: Tooltip(
-        message: tooltip,
-        excludeFromSemantics: true,
-        child: InkWell(
-          onTap: onTap,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          border: Border.all(color: const Color(0xFFE5E7EB)),
           borderRadius: BorderRadius.circular(4),
-          child: Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Icon(
-              icon,
-              size: size * 0.56,
-              color: const Color(0xFF374151),
-            ),
-          ),
         ),
+        child: Icon(icon, size: size * 0.56, color: const Color(0xFF374151)),
       ),
     );
   }
@@ -68,11 +53,7 @@ class ProfileStatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final trimmed = status.trim();
-    final isActive = trimmed.toLowerCase() == 'active';
-    final label = trimmed.isEmpty
-        ? 'Unknown'
-        : trimmed[0].toUpperCase() + trimmed.substring(1);
+    final isActive = status.toLowerCase() == 'active';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
@@ -94,7 +75,7 @@ class ProfileStatusPill extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Text(
-            label,
+            status[0].toUpperCase() + status.substring(1),
             style: context.textTheme.labelSmall?.copyWith(
               color: isActive
                   ? const Color(0xFF065F46)

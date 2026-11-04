@@ -12,12 +12,8 @@ class _ForgotPasswordViewState extends ConsumerState<ForgotPasswordView> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
 
-  late final _loginLink = TapGestureRecognizer()
-    ..onTap = () => context.go(AppRouter.login);
-
   @override
   void dispose() {
-    _loginLink.dispose();
     _emailController.dispose();
     super.dispose();
   }
@@ -82,7 +78,8 @@ class _ForgotPasswordViewState extends ConsumerState<ForgotPasswordView> {
                         color: context.colors.primary,
                         fontFamily: FontFamily.roboto,
                       ),
-                      recognizer: _loginLink,
+                      recognizer: TapGestureRecognizer()
+                        ..onTap = () => context.go(AppRouter.login),
                     ),
                   ],
                 ),

@@ -35,7 +35,6 @@ migrate_working_dir/
 /coverage/
 
 # Symbolication related
-temp_auto_push.bat
 app.*.symbols
 
 # Obfuscation related
@@ -53,6 +52,7 @@ public/fonts/fa-solid-400.woff2
 *.woff2
 
 # VS Code
+.vscode/
 
 # OFL / Font License files
 .ofl
@@ -73,5 +73,3 @@ cmake-build-release/
 
 
 public/fonts/
-.gitignore
-branch_structure.json

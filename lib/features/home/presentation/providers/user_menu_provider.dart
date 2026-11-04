@@ -28,13 +28,6 @@ class UserMenuNotifier extends Notifier<UserMenuState> {
     state = state.copyWith(isAway: !state.isAway);
   }
 
-  /// Syncs the rail dot and profile panel with the confirmed auth presence.
-  void setAway(bool away) {
-    if (state.isAway != away) {
-      state = state.copyWith(isAway: away);
-    }
-  }
-
   void toggleNotifications() {
     state = state.copyWith(notificationsPaused: !state.notificationsPaused);
   }

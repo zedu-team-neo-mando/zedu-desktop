@@ -1,7 +1,8 @@
 import 'dart:math' show Random;
 
 import 'package:zedu/core/core.dart';
-import 'package:zedu/features/features.dart';
+
+import '../domain/dm_conversation.dart';
 
 final dmRepositoryProvider = Provider<DmRepository>((ref) {
   final apiClient = locator<ApiBaseService>();

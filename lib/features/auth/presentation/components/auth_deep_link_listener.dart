@@ -57,25 +57,20 @@ class _AuthDeepLinkListenerState extends ConsumerState<AuthDeepLinkListener> {
 
     if (!mounted) return;
 
-    // This listener is mounted from `App`'s builder, above the Navigator, so
-    // its own context has neither an Overlay nor the router in it.
-    final navigator = AppRouter.navigatorKey.currentState;
-    if (navigator == null) return;
-
     final authState = ref.read(authNotifierProvider);
     if (authState.status == AuthStatus.authenticated) {
-      AppToastService.showAtRoot(
-        navigator,
+      AppToastService.show(
+        context,
         type: AppToastType.success,
         message: 'Logged in successfully!',
       );
-      navigator.context.go(AppRouter.home);
+      context.go(AppRouter.home);
       return;
     }
 
     if (authState.error != null) {
-      AppToastService.showAtRoot(
-        navigator,
+      AppToastService.show(
+        context,
         type: AppToastType.error,
         message: authState.error!,
       );

@@ -39,5 +39,4 @@ abstract interface class AuthRepository {
     required bool clearStatus,
     required bool online,
   });
-  Future<Result<void>> setPresence({required bool online});
 }

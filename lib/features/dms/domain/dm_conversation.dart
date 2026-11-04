@@ -35,11 +35,6 @@ class DmConversation {
 
   String get displayName => username.isNotEmpty ? username : 'Unknown';
 
-  /// Tells conversations apart for selection and drafts. Someone you haven't
-  /// messaged yet has no channel, so their row is identified by the person.
-  String get conversationKey =>
-      channelId.isNotEmpty ? channelId : 'new-dm:$participantId';
-
   String? get effectiveAvatarUrl => (avatarUrl != null && avatarUrl!.isNotEmpty)
       ? avatarUrl
       : defaultAvatarUrl;

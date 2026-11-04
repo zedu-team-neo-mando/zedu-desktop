@@ -54,7 +54,11 @@ class IncomingCallModal extends ConsumerWidget {
                         activeCall.state.remoteAvatarUrl == null ||
                             activeCall.state.remoteAvatarUrl!.isEmpty
                         ? Text(
-                            avatarInitial(activeCall.state.remoteUserName),
+                            activeCall.state.remoteUserName != null &&
+                                    activeCall.state.remoteUserName!.isNotEmpty
+                                ? activeCall.state.remoteUserName![0]
+                                      .toUpperCase()
+                                : '?',
                             style: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,

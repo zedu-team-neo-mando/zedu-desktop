@@ -79,25 +79,6 @@ class _ChannelDirectoryViewState extends ConsumerState<ChannelDirectoryView> {
         Expanded(
           child: channelState.isLoading
               ? const Center(child: CircularProgressIndicator())
-              : channelState.hasError && !channelState.hasValue
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        "Couldn't load channels",
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: colors.textSecondary,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: () => ref.invalidate(channelProvider),
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                )
               : filteredChannels.isEmpty
               ? Center(
                   child: Text(
@@ -157,7 +138,7 @@ class _ChannelDirectoryViewState extends ConsumerState<ChannelDirectoryView> {
                             )
                           : null,
                       trailing: Text(
-                        channel.membersCount.countLabel('member'),
+                        '${channel.membersCount} members',
                         style: textTheme.bodySmall?.copyWith(
                           color: colors.textSecondary,
                         ),

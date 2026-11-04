@@ -27,17 +27,10 @@ class CreditsRepositoryImpl implements CreditsRepository {
 
   @override
   Future<Result<CreditCheckoutSession>> purchaseCredits({
-    String? packageId,
-    String? planId,
+    required String planId,
     required String email,
   }) {
-    return _guard(
-      () => _remote.purchaseCredits(
-        packageId: packageId,
-        planId: planId,
-        email: email,
-      ),
-    );
+    return _guard(() => _remote.purchaseCredits(planId: planId, email: email));
   }
 
   @override

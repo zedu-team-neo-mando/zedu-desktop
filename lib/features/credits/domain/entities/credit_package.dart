@@ -17,8 +17,7 @@ class CreditPackage {
   final List<String> benefits;
   final String? planSlug;
 
-  // Enterprise has no list price, but it is not free: its card contacts sales.
-  bool get isFree => price == 0 && name.toLowerCase() != 'enterprise';
+  bool get isFree => price == 0;
 
   String get priceLabel => price == 0 ? r'$0' : '\$$price';
 

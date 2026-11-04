@@ -110,19 +110,13 @@ class CreditPackageCard extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Flexible(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            package.name.toLowerCase() == 'enterprise'
-                                ? 'Contact Sales'
-                                : package.priceLabel,
-                            style: context.textTheme.headlineMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF111827),
-                            ),
-                          ),
+                      Text(
+                        package.name.toLowerCase() == 'enterprise'
+                            ? 'Contact Sales'
+                            : package.priceLabel,
+                        style: context.textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF111827),
                         ),
                       ),
                       const SizedBox(width: 6),

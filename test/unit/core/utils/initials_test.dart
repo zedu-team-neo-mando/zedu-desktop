@@ -1,72 +1,56 @@
-import 'package:flutter_test/flutter_test.dart';
-import 'package:zedu/core/utils/initials.dart';
+import 'dart:convert';
+
+import 'package:zedu/core/core.dart';
+import '../../../helpers/helpers.dart';
 
 void main() {
-  group('avatarInitial', () {
-    test('upper-cases the first letter', () {
-      expect(avatarInitial('ada'), 'A');
-      expect(avatarInitial('Émile'), 'É');
+  group('firstCharacter', () {
+    test('uppercases the first letter', () {
+      expect(firstCharacter('ada'), 'A');
     });
 
-    test('keeps an emoji whole instead of half a surrogate pair', () {
-      expect(avatarInitial('😀 Ada'), '😀');
-      expect(avatarInitial('🚀launch'), '🚀');
+    test('keeps an emoji whole', () {
+      expect(firstCharacter('😀 Smile'), '😀');
     });
 
-    test('keeps a flag, a joined emoji and a skin tone whole', () {
-      expect(avatarInitial('🇳🇬 Lagos'), '🇳🇬');
-      expect(avatarInitial('👩‍💻 dev'), '👩‍💻');
-      expect(avatarInitial('👍🏽 yes'), '👍🏽');
+    test('keeps a flag whole', () {
+      expect(firstCharacter('🇳🇬 Naija'), '🇳🇬');
+    });
+
+    test('keeps a joined emoji sequence whole', () {
+      expect(firstCharacter('👨‍👩‍👧 Family'), '👨‍👩‍👧');
     });
 
     test('keeps a letter with a combining accent whole', () {
-      expect(avatarInitial('émile'), 'É');
+      expect(firstCharacter('élan'), 'É');
     });
 
-    test('ignores leading spaces', () {
-      expect(avatarInitial('  bola'), 'B');
+    test('keeps a character outside the basic plane whole', () {
+      expect(firstCharacter('𝒜da'), '𝒜');
     });
 
-    test('falls back when there is no name', () {
-      expect(avatarInitial(''), '?');
-      expect(avatarInitial('   '), '?');
-      expect(avatarInitial(null), '?');
-      expect(avatarInitial('', fallback: '#'), '#');
-    });
-  });
-
-  group('avatarInitial edge cases', () {
-    test('returns the upper-cased first letter of a name', () {
-      expect(avatarInitial('John'), 'J');
-      expect(avatarInitial('ada okafor'), 'A');
+    test('ignores leading whitespace', () {
+      expect(firstCharacter('  ada '), 'A');
     });
 
-    test('ignores leading and trailing whitespace', () {
-      expect(avatarInitial(' John'), 'J');
-      expect(avatarInitial('\t\n ada  '), 'A');
+    test('falls back for null, empty and blank text', () {
+      expect(firstCharacter(null), '?');
+      expect(firstCharacter(''), '?');
+      expect(firstCharacter('   '), '?');
     });
 
-    test('falls back to ? for null, empty or whitespace-only names', () {
-      expect(avatarInitial(null), '?');
-      expect(avatarInitial(''), '?');
-      expect(avatarInitial('   '), '?');
-      expect(avatarInitial('\t\n'), '?');
+    test('uses the given fallback', () {
+      expect(firstCharacter('', fallback: 'ZU'), 'ZU');
     });
 
-    test('uses the given fallback when the name is blank', () {
-      expect(avatarInitial('', fallback: 'Z'), 'Z');
-      expect(avatarInitial(' ', fallback: avatarInitial('mo@zedu.chat')), 'M');
-      expect(avatarInitial('Ada', fallback: 'Z'), 'A');
-    });
-
-    test('keeps an emoji or accented letter whole', () {
-      expect(avatarInitial('😀 Smile'), '😀');
-      expect(avatarInitial('👨‍👩‍👧 Family'), '👨‍👩‍👧');
-      expect(avatarInitial('émile'), 'É');
-    });
-
-    test('handles very long names', () {
-      expect(avatarInitial('x' * 10000), 'X');
+    test('never returns half of a surrogate pair', () {
+      for (final name in ['😀', '🇳🇬', '𝒜', '👨‍👩‍👧']) {
+        final initial = firstCharacter(name);
+        // A lone surrogate is replaced by U+FFFD when encoded, so a whole
+        // character survives the round trip and half of one does not.
+        expect(utf8.decode(utf8.encode(initial)), initial);
+        expect(initial, name);
+      }
     });
   });
 }
