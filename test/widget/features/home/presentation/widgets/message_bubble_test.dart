@@ -78,4 +78,26 @@ void main() {
       expect(find.text('?'), findsOneWidget);
     });
   });
+
+  group('MessageBubble voice note', () {
+    testWidgets('labels a voice note without a made-up duration', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          const MessageBubble(
+            author: 'Alice',
+            text: '[Voice Note Attached]',
+            timestamp: '10:00 AM',
+          ),
+        ),
+      );
+
+      expect(find.text('Voice note'), findsOneWidget);
+      expect(find.text('0:05'), findsNothing);
+      // The waveform image is missing from the repo (tracked in #708); its
+      // load error is not what this test checks.
+      tester.takeException();
+    });
+  });
 }

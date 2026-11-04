@@ -243,8 +243,11 @@ class _MessageBody extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
+            // The bubble only gets the '[Voice Note Attached]' text, with no
+            // audio or length, so it says what it is instead of a made-up
+            // duration.
             Text(
-              '0:05',
+              'Voice note',
               style: TextStyle(
                 color: colors.primary,
                 fontWeight: FontWeight.bold,
