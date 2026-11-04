@@ -303,7 +303,15 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   Future<void> logout() async {
-    AppLogger.i('Logout — clearing session', tag: _tag);
+    AppLogger.i('Logout - clearing session', tag: _tag);
+    final userId = state.user?.id;
+    if (userId != null && userId.isNotEmpty) {
+      try {
+        await DmDraftStore.clearAllForUser(_storage, userId: userId);
+      } catch (error) {
+        AppLogger.w('Failed to clear DM drafts on logout: $error', tag: _tag);
+      }
+    }
     await _storage.deleteAccessToken();
     _bumpSession();
     ref.read(userMenuStateProvider.notifier).reset();

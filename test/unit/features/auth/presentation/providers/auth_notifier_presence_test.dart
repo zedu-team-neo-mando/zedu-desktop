@@ -1200,4 +1200,37 @@ void main() {
       expect(StatusTimeout.dontRemove.apiValue, 'dont-clear');
     });
   });
+
+  group('AuthNotifier.logout', () {
+    test(
+      'removes the signed-in user draft keys before clearing the token',
+      () async {
+        final (container, notifier, _) = await _buildSession();
+        final storage = _storage();
+        when(() => storage.readAllData()).thenAnswer(
+          (_) async => {
+            'dm_draft_user-1_org-1_channel-1':
+                '{"text":"secret","updatedAt":1}',
+            'dm_draft_user-2_org-1_channel-1': '{"text":"other","updatedAt":2}',
+          },
+        );
+        when(() => storage.deleteValue(any())).thenAnswer((_) async {});
+        when(() => storage.deleteAccessToken()).thenAnswer((_) async {});
+
+        await notifier.logout();
+
+        verify(
+          () => storage.deleteValue('dm_draft_user-1_org-1_channel-1'),
+        ).called(1);
+        verifyNever(
+          () => storage.deleteValue('dm_draft_user-2_org-1_channel-1'),
+        );
+        verify(() => storage.deleteAccessToken()).called(1);
+        expect(
+          container.read(authNotifierProvider).status,
+          AuthStatus.unauthenticated,
+        );
+      },
+    );
+  });
 }
