@@ -42,4 +42,12 @@ class User {
   final UserStatus status;
 
   String get fullname => '$firstName $lastName';
+
+  /// Two-letter initials for avatar fallbacks, matching [ProfileAccount.initials].
+  String get initials {
+    final parts = fullname.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty || parts.first.isEmpty) return 'ZU';
+    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+  }
 }

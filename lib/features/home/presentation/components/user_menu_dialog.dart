@@ -14,6 +14,10 @@ class UserMenuDialog extends ConsumerWidget {
     final orgSlug = authUser?.currentOrganisationSlug ?? '';
     final signOutTarget = orgSlug.isEmpty ? 'Zedu' : orgSlug;
     final isOnline = status.online;
+    final avatarUrl = (authUser?.avatarUrl.isNotEmpty ?? false)
+        ? authUser!.avatarUrl
+        : (authUser?.defaultAvatarUrl ?? '');
+    final initials = authUser?.initials ?? 'ZU';
 
     return Dialog(
       insetPadding: const EdgeInsets.only(bottom: 24, left: 74),
@@ -48,18 +52,16 @@ class UserMenuDialog extends ConsumerWidget {
                     // Avatar with presence dot overlay
                     Stack(
                       children: [
-                        Container(
+                        _UserAvatar(
                           width: 48,
                           height: 48,
-                          decoration: BoxDecoration(
-                            color: colors.sidebar,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Center(
-                            child: Icon(
-                              Icons.person,
-                              color: Colors.white,
-                              size: 32,
+                          avatarUrl: avatarUrl,
+                          fallback: Text(
+                            initials,
+                            style: TextStyle(
+                              color: colors.onPrimary,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
@@ -274,6 +276,46 @@ class UserMenuDialog extends ConsumerWidget {
 }
 
 // ── Internal helper widget ─────────────────────────────────────────────────────
+
+/// Rounded avatar box: shows the profile image when [avatarUrl] is set,
+/// otherwise the provided [fallback] (the user's initials).
+class _UserAvatar extends StatelessWidget {
+  const _UserAvatar({
+    required this.avatarUrl,
+    required this.fallback,
+    required this.width,
+    required this.height,
+  });
+
+  final String avatarUrl;
+  final Widget fallback;
+  final double width;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: width,
+        height: height,
+        color: colors.sidebar,
+        alignment: Alignment.center,
+        child: avatarUrl.isEmpty
+            ? fallback
+            : Image.network(
+                avatarUrl,
+                width: width,
+                height: height,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => fallback,
+              ),
+      ),
+    );
+  }
+}
 
 class _MenuItemButton extends StatelessWidget {
   final IconData icon;
