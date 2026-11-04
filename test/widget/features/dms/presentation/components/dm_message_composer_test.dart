@@ -369,5 +369,29 @@ void main() {
         greaterThan(0),
       );
     });
+
+    testWidgets('a long draft still leaves the Send control on screen', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1100, 500);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(buildComposerUnderTest());
+      await tester.enterText(
+        find.byType(TextField),
+        List.generate(40, (i) => 'Line ${i + 1}').join('\n'),
+      );
+      await tester.pump();
+
+      final composerBottom = tester
+          .getRect(find.byType(DmMessageComposer))
+          .bottom;
+      expect(composerBottom, lessThan(500));
+      expect(
+        tester.getRect(find.byIcon(Icons.send_rounded)).bottom,
+        lessThanOrEqualTo(composerBottom),
+      );
+    });
   });
 }
