@@ -41,7 +41,14 @@ class _HomeViewState extends ConsumerState<HomeView> {
             child: Row(
               children: [
                 AppSidebarRail(activeType: ref.watch(homeSidebarProvider)),
-                ResizableSidebar(child: const _MainSidebarSwitcher()),
+                ResizableSidebar(
+                  // Read once: the sidebar owns the width while it is dragged.
+                  initialWidth: ref.read(sidebarWidthProvider),
+                  onWidthChanged: ref
+                      .read(sidebarWidthProvider.notifier)
+                      .setWidth,
+                  child: const _MainSidebarSwitcher(),
+                ),
                 Expanded(
                   child: Stack(
                     children: [
