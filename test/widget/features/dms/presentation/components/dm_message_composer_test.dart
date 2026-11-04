@@ -325,4 +325,49 @@ void main() {
       expect(controller.selection, const TextSelection.collapsed(offset: 5));
     });
   });
+
+  group('editor height cap (#222)', () {
+    double fieldHeight(WidgetTester tester) =>
+        tester.getSize(find.byType(TextField)).height;
+
+    testWidgets('a short draft keeps the compact single-line height', (
+      tester,
+    ) async {
+      await tester.pumpWidget(buildComposerUnderTest());
+      final emptyHeight = fieldHeight(tester);
+
+      await tester.enterText(find.byType(TextField), 'Hi Ada');
+      await tester.pump();
+
+      expect(fieldHeight(tester), emptyHeight);
+    });
+
+    testWidgets('a long draft stops growing at eight lines and scrolls', (
+      tester,
+    ) async {
+      await tester.pumpWidget(buildComposerUnderTest());
+      final shortHeight = fieldHeight(tester);
+      final draft = List.generate(40, (i) => 'Line ${i + 1}').join('\n');
+
+      await tester.enterText(find.byType(TextField), draft);
+      await tester.pump();
+
+      final field = tester.widget<TextField>(find.byType(TextField));
+      expect(field.maxLines, 8);
+      final cappedHeight = fieldHeight(tester);
+      expect(cappedHeight, greaterThan(shortHeight));
+      expect(cappedHeight, lessThan(200));
+      expect(composerController(tester).text, draft);
+
+      final internalScroll = find.descendant(
+        of: find.byType(EditableText),
+        matching: find.byType(Scrollable),
+      );
+      expect(internalScroll, findsOneWidget);
+      expect(
+        tester.state<ScrollableState>(internalScroll).position.maxScrollExtent,
+        greaterThan(0),
+      );
+    });
+  });
 }
