@@ -94,11 +94,10 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
     if (!_addEmailFromInput()) return;
 
     if (_invites.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please enter at least one email address.'),
-          backgroundColor: context.colors.error,
-        ),
+      AppToastService.show(
+        context,
+        type: AppToastType.error,
+        message: 'Please enter at least one email address.',
       );
       return;
     }
@@ -141,11 +140,10 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
       setState(() {
         _isLoading = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(lastError),
-          backgroundColor: context.colors.error,
-        ),
+      AppToastService.show(
+        context,
+        type: AppToastType.error,
+        message: lastError,
       );
     }
   }
