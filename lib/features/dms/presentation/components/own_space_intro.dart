@@ -67,8 +67,7 @@ class OwnSpaceIntro extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 TextSpan(
-                  text:
-                      'Save resources from class, keep track of your tasks, or draft a message here before you post it to a channel.',
+                  text: 'Save resources from class, keep track of your tasks, or draft a message here before you post it to a channel.',
                 ),
               ],
             ),
