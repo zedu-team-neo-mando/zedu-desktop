@@ -38,15 +38,21 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
   void _onSearchChanged() {
     final query = _searchController.text.trim().toLowerCase();
     final allMembers = ref.read(userProfileNotifierProvider).teamMembers;
+    final currentUserId = ref.read(authNotifierProvider).user?.id;
 
     setState(() {
       if (query.isEmpty) {
-        // Show all members that are not already selected
+        // Show all members that are not already selected and not the current user
         _filteredMembers = allMembers
-            .where((m) => !_selectedMembers.any((s) => s.id == m.id))
+            .where(
+              (m) =>
+                  m.id != currentUserId &&
+                  !_selectedMembers.any((s) => s.id == m.id),
+            )
             .toList();
       } else {
         _filteredMembers = allMembers.where((m) {
+          if (m.id == currentUserId) return false;
           final isSelected = _selectedMembers.any((s) => s.id == m.id);
           if (isSelected) return false;
 
@@ -561,21 +567,30 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
     final count = _selectedMembers.length;
     final isReady = count >= 2;
 
+    final IconData icon;
+    final Color color;
+    final String text;
+
+    if (isReady) {
+      icon = Icons.check_circle;
+      color = colors.success;
+      text = 'Ready to create conversation! (Selected: $count members)';
+    } else {
+      icon = Icons.info_outline;
+      color = _errorMessage != null ? colors.error : colors.textSecondary;
+      text =
+          'Select at least 2 members to start a group DM (Selected: $count/2)';
+    }
+
     return Row(
       children: [
-        Icon(
-          isReady ? Icons.check_circle : Icons.info_outline,
-          size: 16,
-          color: isReady ? colors.success : colors.error,
-        ),
+        Icon(icon, size: 16, color: color),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
-            isReady
-                ? 'Ready to create conversation! (Selected: $count members)'
-                : 'Select at least 2 members to start a group DM (Selected: $count/2)',
+            text,
             style: TextStyle(
-              color: isReady ? colors.success : colors.error,
+              color: color,
               fontSize: 13,
               fontWeight: FontWeight.w500,
             ),
