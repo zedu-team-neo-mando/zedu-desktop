@@ -330,10 +330,14 @@ class AuthNotifier extends Notifier<AuthState> {
         _adoptSessionUser(result.value.user);
       case Failure<AuthSession>():
         AppLogger.w('Login rejected — ${result.error.message}', tag: _tag);
-        state = state.copyWith(
-          isLoading: false,
-          error: result.error.friendlyMessage,
-        );
+        final errorMessage = switch (result.error.kind) {
+          ApiFailureKind.network ||
+          ApiFailureKind.timeout ||
+          ApiFailureKind.server => result.error.friendlyMessage,
+          _ =>
+            'Invalid email or password. Please check your credentials and try again.',
+        };
+        state = state.copyWith(isLoading: false, error: errorMessage);
     }
   }
 
