@@ -1,3 +1,4 @@
+import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
 import '../../../../../../helpers/helpers.dart';
@@ -101,5 +102,24 @@ void main() {
     await _pump(tester, account.copyWith(username: '   '));
 
     expect(find.text('@adalovelace'), findsOneWidget);
+  });
+
+  testWidgets('colours the initials placeholder with theme tokens', (
+    tester,
+  ) async {
+    await _pump(tester, account);
+
+    final initials = tester.widget<Text>(find.text('AL'));
+    final box = tester.widget<Container>(
+      find
+          .ancestor(of: find.text('AL'), matching: find.byType(Container))
+          .first,
+    );
+
+    expect(initials.style!.color, AppPalette.light.primary);
+    expect(
+      (box.decoration! as BoxDecoration).color,
+      AppPalette.light.primaryBg,
+    );
   });
 }
