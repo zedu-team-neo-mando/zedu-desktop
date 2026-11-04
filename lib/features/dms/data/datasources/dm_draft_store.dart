@@ -42,7 +42,31 @@ class DmDraftStore extends ChangeNotifier {
   bool _disposed = false;
 
   DmDraftStore(this._storage, {required String userId, required String orgId})
-    : _keyPrefix = 'dm_draft_${userId}_${orgId}_';
+    : _keyPrefix = '${userKeyPrefix(userId)}${orgId}_';
+
+  /// Prefix shared by every draft of [userId], across organisations.
+  static String userKeyPrefix(String userId) => 'dm_draft_${userId}_';
+
+  /// Deletes every persisted draft that belongs to [userId].
+  ///
+  /// Signing out on a shared computer must not leave private message text
+  /// behind. The in-memory cache belongs to a store instance that the provider
+  /// replaces on the next sign-in, so only storage keys are removed here.
+  static Future<void> clearAllForUser(
+    SecureStorageService storage, {
+    required String userId,
+  }) async {
+    if (userId.isEmpty) return;
+    final prefix = userKeyPrefix(userId);
+    final all = await storage.readAllData();
+    for (final key in all.keys.where((key) => key.startsWith(prefix))) {
+      try {
+        await storage.deleteValue(key);
+      } catch (_) {
+        // Keep clearing the remaining keys even if one delete fails.
+      }
+    }
+  }
 
   @override
   void dispose() {
