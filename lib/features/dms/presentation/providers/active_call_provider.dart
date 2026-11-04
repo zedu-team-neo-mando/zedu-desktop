@@ -68,17 +68,14 @@ class ActiveCallNotifier extends ChangeNotifier {
   ActiveCallState get state => _state;
   bool get isDisposed => _disposed;
 
-  @override
-  void notifyListeners() {
-    if (_disposed) return;
-    super.notifyListeners();
-  }
-
   /// The ringtone playing for the current incoming call, or null.
   CallRingtone? _ringing;
 
+  // Both halves are load-bearing: the guard is #2572's post-dispose silence and
+  // _syncRingtone() is #2441's ringtone, merged into the one override Dart allows.
   @override
   void notifyListeners() {
+    if (_disposed) return;
     _syncRingtone();
     super.notifyListeners();
   }
