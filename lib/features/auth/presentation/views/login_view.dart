@@ -175,65 +175,73 @@ class _LoginViewState extends ConsumerState<LoginView> {
                   ),
                 ),
                 context.gapV(26),
-                Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      AppTextField(
-                        controller: _emailController,
-                        label: 'Email address',
-                        hint: 'Enter your email address',
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                        validator: (value) =>
-                            Validators.validateEmail(context, value),
-                      ),
-                      context.gapV(16),
-                      AppTextField(
-                        isPassword: true,
-                        controller: _passwordController,
-                        label: 'Password',
-                        hint: 'Password',
-                        textInputAction: TextInputAction.done,
-                        onFieldSubmitted: (_) => _onLoginPressed(),
-                        validator: (value) => Validators.validateRequired(
-                          context,
-                          value?.trim(),
-                          fieldName: 'Password',
+                AutofillGroup(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        AppTextField(
+                          controller: _emailController,
+                          label: 'Email address',
+                          hint: 'Enter your email address',
+                          keyboardType: TextInputType.emailAddress,
+                          autofillHints: const [
+                            AutofillHints.username,
+                            AutofillHints.email,
+                          ],
+                          textInputAction: TextInputAction.next,
+                          validator: (value) =>
+                              Validators.validateEmail(context, value),
                         ),
-                      ),
-                      context.gapV(8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Checkbox(
-                                value: _rememberMe,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _rememberMe = value ?? false;
-                                  });
-                                },
-                              ),
-                              const Text('Remember me'),
-                            ],
+                        context.gapV(16),
+                        AppTextField(
+                          isPassword: true,
+                          controller: _passwordController,
+                          label: 'Password',
+                          hint: 'Password',
+                          autofillHints: const [AutofillHints.password],
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => _onLoginPressed(),
+                          validator: (value) => Validators.validateRequired(
+                            context,
+                            value?.trim(),
+                            fieldName: 'Password',
                           ),
-                          GestureDetector(
-                            onTap: () => context.push(AppRouter.forgotPassword),
-                            child: Text(
-                              'Forgot Password?',
-                              style: context.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w400,
-                                color: context.colors.primary,
-                                fontFamily: FontFamily.roboto,
+                        ),
+                        context.gapV(8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Checkbox(
+                                  value: _rememberMe,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _rememberMe = value ?? false;
+                                    });
+                                  },
+                                ),
+                                const Text('Remember me'),
+                              ],
+                            ),
+                            GestureDetector(
+                              onTap: () =>
+                                  context.push(AppRouter.forgotPassword),
+                              child: Text(
+                                'Forgot Password?',
+                                style: context.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w400,
+                                  color: context.colors.primary,
+                                  fontFamily: FontFamily.roboto,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 context.gapV(18),
