@@ -29,5 +29,20 @@ void main() {
       expect(find.text('Enter your organization Name'), findsNothing);
       expect(find.text('What does your organization do'), findsNothing);
     });
+
+    testWidgets('country dropdown lists every country in kCountries', (
+      tester,
+    ) async {
+      await tester.pumpWidget(buildCreateOrganizationViewUnderTest());
+
+      final menu = tester.widget<DropdownMenu<String>>(
+        find.byType(DropdownMenu<String>),
+      );
+      expect(menu.dropdownMenuEntries.length, kCountries.length);
+      expect(
+        menu.dropdownMenuEntries.map((entry) => entry.value),
+        containsAll(['Ireland', 'Spain']),
+      );
+    });
   });
 }
