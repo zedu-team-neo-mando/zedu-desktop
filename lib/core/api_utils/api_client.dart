@@ -107,7 +107,9 @@ class ApiBaseService {
     Map<String, String>? headers,
   }) async {
     try {
-      final response = await _dio.request<T>(
+      // Read the body untyped: asking Dio for T lets its own cast throw a
+      // TypeError before the response shape can be validated here.
+      final response = await _dio.request<Object?>(
         path,
         data: data,
         queryParameters: queryParameters,
@@ -128,8 +130,19 @@ class ApiBaseService {
         );
       }
 
+      if (responseData is! T) {
+        throw ApiFailure(
+          message:
+              'Expected a ${T.toString()} response from $path but got '
+              '${responseData.runtimeType}.',
+          statusCode: response.statusCode,
+          path: path,
+          kind: ApiFailureKind.parsing,
+        );
+      }
+
       return ApiResponseModel<T>(
-        data: responseData as T,
+        data: responseData,
         statusCode: response.statusCode ?? 0,
         message: response.statusMessage,
       );

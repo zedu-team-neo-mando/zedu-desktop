@@ -44,6 +44,39 @@ void main() {
     });
 
     test(
+      'a response of the wrong shape raises ApiFailure, not a TypeError',
+      () async {
+        server.listen((request) {
+          request.response
+            ..headers.contentType = ContentType.json
+            ..write('[1,2,3]');
+          request.response.close();
+        });
+        final api = ApiBaseService(
+          config: AppConfig(apiBaseUrl: baseUrl, usesMockData: false),
+        );
+
+        await expectLater(
+          api.get<Map<String, dynamic>>(path: 'health'),
+          throwsA(
+            isA<ApiFailure>()
+                .having(
+                  (failure) => failure.kind,
+                  'kind',
+                  ApiFailureKind.parsing,
+                )
+                .having((failure) => failure.path, 'path', 'health')
+                .having(
+                  (failure) => failure.message,
+                  'message',
+                  contains('List<dynamic>'),
+                ),
+          ),
+        );
+      },
+    );
+
+    test(
       'fallback client times out when a server never responds',
       () async {
         server.listen((request) {});
