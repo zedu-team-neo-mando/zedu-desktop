@@ -102,7 +102,10 @@ class ChannelMessageTile extends StatelessWidget {
     final colors = context.colors;
     final avatarUrl = message.avatarUrl;
     final time = message.createdAt;
-    final initial = avatarInitial(message.senderName);
+    final trimmedName = message.senderName.trim();
+    final initial = trimmedName.isNotEmpty
+        ? trimmedName.characters.first.toUpperCase()
+        : '?';
     final status = message.status;
 
     return Padding(

@@ -257,10 +257,7 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
               child: Column(
                 children: teamMembers.map((member) {
                   final name = member.name ?? member.email;
-                  final initial = avatarInitial(
-                    member.name,
-                    fallback: avatarInitial(member.email),
-                  );
+                  final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
                   return InkWell(
                     onTap: () => _insertMention(name),
                     child: Padding(

@@ -25,7 +25,7 @@ class ProfileSectionHeader extends StatelessWidget {
                 title,
                 style: context.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
-                  color: context.colors.textPrimary,
+                  color: const Color(0xFF111827),
                 ),
               ),
               const SizedBox(height: 4),

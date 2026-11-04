@@ -17,9 +17,6 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  // Google may sign in an account that already exists, so the success toast
-  // must not claim a new account was created.
-  bool _signingUpWithGoogle = false;
   late final _loginLink = TapGestureRecognizer()
     ..onTap = () => context.go(AppRouter.login);
   late final _termsLink = TapGestureRecognizer()
@@ -40,7 +37,6 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
 
   Future<void> _onCreateAccountPressed() async {
     if (!_formKey.currentState!.validate()) return;
-    _signingUpWithGoogle = false;
 
     ref
         .read(authNotifierProvider.notifier)
@@ -51,12 +47,6 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
         );
   }
 
-  void _onGooglePressed() {
-    if (ref.read(authNotifierProvider).isLoading) return;
-    _signingUpWithGoogle = true;
-    ref.read(authNotifierProvider.notifier).loginWithGoogle();
-  }
-
   @override
   Widget build(BuildContext context) {
     ref.listen<AuthState>(authNotifierProvider, (previous, next) {
@@ -65,9 +55,7 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
         AppToastService.show(
           context,
           type: AppToastType.success,
-          message: _signingUpWithGoogle
-              ? 'Signed in with Google!'
-              : 'Account created successfully!',
+          message: 'Account created successfully!',
         );
         context.go(AppRouter.home);
       }
@@ -247,8 +235,12 @@ class _SignUpViewState extends ConsumerState<SignUpView> {
                 SocialAuthButton(
                   icon: 'assets/svgs/google_logo.svg',
                   label: 'Sign up with Google',
+                  // The same Google flow as Login: the backend creates the
+                  // account on first use, and the listener above handles
+                  // success (go home) and errors (toast).
                   loading: authState.isLoading,
-                  onPressed: _onGooglePressed,
+                  onPressed: () =>
+                      ref.read(authNotifierProvider.notifier).loginWithGoogle(),
                 ),
                 context.gapV(12),
                 SocialAuthButton(

@@ -45,7 +45,10 @@ class _MessageBubbleState extends State<MessageBubble> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final initial = avatarInitial(widget.author);
+    final trimmedAuthor = widget.author.trim();
+    final initial = trimmedAuthor.isNotEmpty
+        ? trimmedAuthor.characters.first.toUpperCase()
+        : '?';
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovering = true),

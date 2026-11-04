@@ -155,10 +155,7 @@ class _GroupDetailsPanelState extends State<GroupDetailsPanel> {
                             alpha: 0.1,
                           ),
                           child: Text(
-                            avatarInitial(
-                              member.name,
-                              fallback: avatarInitial(member.email),
-                            ),
+                            (member.name ?? member.email)[0],
                             style: TextStyle(
                               fontSize: 12,
                               color: colors.primary,

@@ -14,10 +14,8 @@ class App extends ConsumerWidget {
       builder: (context, child) => DesktopWindowTitleListener(
         child: CreditsPaymentDeepLinkListener(
           child: AuthDeepLinkListener(
-            child: SessionExpiryListener(
-              child: QuickSwitcherShortcut(
-                child: child ?? const SizedBox.shrink(),
-              ),
+            child: QuickSwitcherShortcut(
+              child: child ?? const SizedBox.shrink(),
             ),
           ),
         ),

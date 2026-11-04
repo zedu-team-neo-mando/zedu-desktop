@@ -15,7 +15,7 @@ abstract interface class CreditsRemoteDataSource {
 }
 
 class CreditsRemoteDataSourceImpl implements CreditsRemoteDataSource {
-  CreditsRemoteDataSourceImpl({
+  const CreditsRemoteDataSourceImpl({
     required AppConfig config,
     required ApiBaseService apiBaseService,
   }) : _config = config,
@@ -23,7 +23,6 @@ class CreditsRemoteDataSourceImpl implements CreditsRemoteDataSource {
 
   final AppConfig _config;
   final ApiBaseService _api;
-  final Map<String, dynamic> _mockUsage = Map.of(_initialMockUsage);
 
   @override
   Future<List<CreditPackageModel>> getPackages() async {
@@ -138,7 +137,7 @@ class CreditsRemoteDataSourceImpl implements CreditsRemoteDataSource {
   }
 }
 
-const _initialMockUsage = <String, dynamic>{
+const _mockUsage = <String, dynamic>{
   'balance': 10,
   'total_purchased': 10,
   'total_consumed': 0,
