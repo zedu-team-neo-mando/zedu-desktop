@@ -326,6 +326,101 @@ void main() {
     });
   });
 
+  group('DmMessageComposer toolbar on a composer that was never focused', () {
+    composerTest('Bold inserts its markers with the cursor between', (
+      tester,
+      field,
+    ) async {
+      expect(field.controller!.selection.isValid, isFalse);
+
+      await tester.tap(find.byTooltip('Bold (Ctrl+B)'));
+      await tester.pump();
+
+      expect(field.controller!.text, '****');
+      expect(
+        field.controller!.selection,
+        const TextSelection.collapsed(offset: 2),
+      );
+    });
+
+    composerTest('Link inserts the link stub with the cursor in the label', (
+      tester,
+      field,
+    ) async {
+      await tester.tap(find.byTooltip('Link'));
+      await tester.pump();
+
+      expect(field.controller!.text, '[](url)');
+      expect(
+        field.controller!.selection,
+        const TextSelection.collapsed(offset: 1),
+      );
+    });
+
+    composerTest('Block quote starts a quote line', (tester, field) async {
+      await tester.tap(find.byTooltip('Block quote'));
+      await tester.pump();
+
+      expect(field.controller!.text, '> ');
+    });
+
+    composerTest('Italic focuses the field so typing continues there', (
+      tester,
+      field,
+    ) async {
+      await tester.tap(find.byTooltip('Italic (Ctrl+I)'));
+      await tester.pump();
+
+      expect(field.controller!.text, '**');
+      expect(
+        tester
+            .widget<EditableText>(find.byType(EditableText))
+            .focusNode
+            .hasFocus,
+        isTrue,
+      );
+    });
+
+    composerTest('appends after draft text instead of doing nothing', (
+      tester,
+      field,
+    ) async {
+      await tester.enterText(find.byType(TextField), 'hello');
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('Inline code'));
+      await tester.pump();
+
+      expect(field.controller!.text, 'hello``');
+      expect(
+        field.controller!.selection,
+        const TextSelection.collapsed(offset: 6),
+      );
+    });
+
+    composerTest('still wraps exactly the selected range', (
+      tester,
+      field,
+    ) async {
+      await tester.tap(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), 'hello');
+      field.controller!.selection = const TextSelection(
+        baseOffset: 0,
+        extentOffset: 5,
+      );
+      await tester.pump();
+
+      await tester.tap(find.byTooltip('Strikethrough'));
+      await tester.pump();
+
+      expect(field.controller!.text, '~~hello~~');
+      expect(
+        field.controller!.selection,
+        const TextSelection(baseOffset: 2, extentOffset: 7),
+      );
+    });
+  });
+
   group('DmMessageComposer drafts with no channel yet', () {
     testWidgets('each person keeps their own draft', (tester) async {
       final draftKey = ValueNotifier('new-dm:ada');
