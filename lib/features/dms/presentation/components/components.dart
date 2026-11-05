@@ -7,5 +7,6 @@ export 'dm_emoji_picker.dart';
 export 'buzz_meeting_view.dart';
 export 'dm_profile_card.dart';
 export 'image_attachment_viewer.dart';
+export 'pdf_attachment_viewer.dart';
 export 'own_space_intro.dart';
 export 'conversation_files_dialog.dart';

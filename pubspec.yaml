@@ -33,6 +33,7 @@ dependencies:
   screen_retriever: ^0.2.0
   window_manager: ^0.5.1
   package_info_plus: ^9.0.1
+  pdfrx: ^2.4.7
 
 dev_dependencies:
   flutter_test:

@@ -1273,6 +1273,16 @@ class _AttachmentBubbleList extends StatelessWidget {
     );
   }
 
+  void _openPdf(BuildContext context, String fileUrl, String fileName) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) =>
+            PdfAttachmentViewer(fileUrl: fileUrl, fileName: fileName),
+      ),
+    );
+  }
+
   Widget _buildGenericFile(
     String fileName,
     String fileLink,
@@ -1325,6 +1335,7 @@ class _AttachmentBubbleList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -1339,6 +1350,52 @@ class _AttachmentBubbleList extends StatelessWidget {
           'gif',
           'webp',
         ].contains((item['file_type'] ?? '').toString().toLowerCase());
+        final isPdf = 'pdf' == (item['file_type'] ?? '').toString().toLowerCase() ||
+            fileName.toLowerCase().endsWith('.pdf');
+
+        if (isPdf && fileLink.isNotEmpty) {
+          return GestureDetector(
+            onTap: () => _openPdf(context, fileLink, fileName),
+            child: Container(
+              width: 120,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isMe
+                    ? colors.primary.withValues(alpha: 0.15)
+                    : colors.onPrimary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isMe
+                      ? colors.primary.withValues(alpha: 0.3)
+                      : colors.divider,
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.picture_as_pdf_rounded,
+                    color: isMe ? colors.primary : colors.textPrimary,
+                    size: 28,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    fileName,
+                    style: TextStyle(
+                      color: colors.textPrimary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
 
         if (isImage && fileLink.isNotEmpty) {
           final isNetwork = fileLink.startsWith('http');
