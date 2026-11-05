@@ -52,9 +52,11 @@ class CreditsRemoteDataSourceImpl implements CreditsRemoteDataSource {
     final response = await _api.get<Map<String, dynamic>>(
       path: '/credits/usage/$orgId',
     );
-    return CreditUsageModel.fromJson(
-      response.data['data'] as Map<String, dynamic>,
-    );
+    final data = response.data['data'];
+    final usageJson = data is List
+        ? (data.isNotEmpty ? data.first as Map<String, dynamic> : <String, dynamic>{})
+        : (data as Map<String, dynamic>? ?? <String, dynamic>{});
+    return CreditUsageModel.fromJson(usageJson);
   }
 
   @override
