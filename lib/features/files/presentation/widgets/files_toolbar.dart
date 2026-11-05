@@ -47,7 +47,7 @@ class FilesToolbar extends ConsumerWidget {
           value: state.sort,
           options: FilesSort.values,
           labelOf: (s) => s.label,
-          showsValue: false,
+          valueLabelOf: (s) => 'Sort: ${s.label}',
           allowsClear: false,
           onChanged: (sort) {
             if (sort != null) notifier.setSort(sort);
@@ -158,7 +158,7 @@ class FilesDropdown<T> extends StatelessWidget {
     required this.options,
     required this.labelOf,
     required this.onChanged,
-    this.showsValue = true,
+    this.valueLabelOf,
     this.allowsClear = true,
   });
 
@@ -168,8 +168,10 @@ class FilesDropdown<T> extends StatelessWidget {
   final String Function(T) labelOf;
   final ValueChanged<T?> onChanged;
 
-  /// Whether the button shows the chosen option instead of [placeholder].
-  final bool showsValue;
+  /// The label shown when a value is chosen. Defaults to [labelOf].
+  final String Function(T)? valueLabelOf;
+
+  /// Whether the menu starts with an entry that clears the choice.
   final bool allowsClear;
 
   static const _clear = -1;
@@ -178,10 +180,10 @@ class FilesDropdown<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final current = value;
-    final label = showsValue && current != null
-        ? labelOf(current)
+    final label = current != null
+        ? (valueLabelOf ?? labelOf)(current)
         : placeholder;
-    final isActive = showsValue && current != null;
+    final isActive = current != null;
 
     return PopupMenuButton<int>(
       tooltip: placeholder,
