@@ -9,6 +9,8 @@ import 'package:zedu/features/features.dart';
 
 import 'composer/composer.dart';
 
+const _voiceLogTag = 'dm-voice';
+
 class DmMessageComposer extends ConsumerStatefulWidget {
   final String recipientName;
   final String? hintText;
@@ -582,10 +584,18 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
         _isRecording = true;
         _recordSeconds = 0;
       });
-    } catch (error) {
+    } catch (error, stackTrace) {
       _activeRecordingPath = null;
       if (mounted) setState(() => _isRecording = false);
-      _showVoiceError('Could not start recording: $error');
+      AppLogger.w(
+        'Could not start the voice recording',
+        tag: _voiceLogTag,
+        error: error,
+        stackTrace: stackTrace,
+      );
+      _showVoiceError(
+        'Could not start recording. Check your microphone and try again.',
+      );
     } finally {
       _isStarting = false;
     }
@@ -611,9 +621,15 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
           );
         }
       });
-    } catch (error) {
+    } catch (error, stackTrace) {
       if (mounted) setState(() => _isRecording = false);
-      _showVoiceError('Could not save the recording: $error');
+      AppLogger.w(
+        'Could not save the voice recording',
+        tag: _voiceLogTag,
+        error: error,
+        stackTrace: stackTrace,
+      );
+      _showVoiceError('Could not save the recording. Please try again.');
     }
   }
 
@@ -641,8 +657,14 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
         await player.play(DeviceFileSource(note.path));
         if (mounted) setState(() => _isPreviewPlaying = true);
       }
-    } catch (error) {
-      _showVoiceError('Could not play the recording: $error');
+    } catch (error, stackTrace) {
+      AppLogger.w(
+        'Could not play back the voice recording',
+        tag: _voiceLogTag,
+        error: error,
+        stackTrace: stackTrace,
+      );
+      _showVoiceError('Could not play the recording.');
     }
   }
 
