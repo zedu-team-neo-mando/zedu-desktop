@@ -88,6 +88,8 @@ class FilesNotifier extends Notifier<FilesState> {
 class FilesListNotifier extends AsyncNotifier<FilesPage> {
   @override
   Future<FilesPage> build() async {
+    // A workspace switch can leave the default query unchanged.
+    ref.watch(currentOrgIdProvider);
     final query = ref.watch(filesProvider.select((s) => s.query));
     final result = await ref.read(filesRepositoryProvider).fetchFiles(query);
     return switch (result) {
@@ -101,6 +103,7 @@ class FilesListNotifier extends AsyncNotifier<FilesPage> {
 class FoldersListNotifier extends AsyncNotifier<FoldersPage> {
   @override
   Future<FoldersPage> build() async {
+    ref.watch(currentOrgIdProvider);
     final (view, parentId, page) = ref.watch(
       filesProvider.select((s) => (s.view, s.folderId, s.folderPage)),
     );
