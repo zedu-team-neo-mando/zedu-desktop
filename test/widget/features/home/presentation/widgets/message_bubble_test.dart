@@ -78,4 +78,43 @@ void main() {
       expect(find.text('?'), findsOneWidget);
     });
   });
+
+  group('MessageBubble Voice Note Tests', () {
+    testWidgets('renders a playable voice note with no hard-coded duration', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          const MessageBubble(
+            author: 'Alice',
+            text: r'[Voice Note Attached] [Voice Note: C:\temp\note.m4a]',
+            timestamp: '10:00 AM',
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byTooltip('Play voice note'), findsOneWidget);
+      expect(find.text('0:05'), findsNothing);
+    });
+
+    testWidgets(
+      'legacy voice note text renders a static waveform with no timer',
+      (tester) async {
+        await tester.pumpWidget(
+          _wrap(
+            const MessageBubble(
+              author: 'Alice',
+              text: '[Voice Note Attached]',
+              timestamp: '10:00 AM',
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.byIcon(Icons.play_circle_fill), findsOneWidget);
+        expect(find.text('0:05'), findsNothing);
+      },
+    );
+  });
 }

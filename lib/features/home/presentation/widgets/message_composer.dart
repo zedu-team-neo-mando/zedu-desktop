@@ -25,6 +25,10 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
   bool _showMentions = false;
   final List<String> _attachedFiles = [];
   final AudioRecorder _audioRecorder = AudioRecorder();
+  Timer? _recordTimer;
+  int _recordSeconds = 0;
+  String? _activeRecordingPath;
+  XFile? _voiceNote;
 
   @override
   void initState() {
@@ -38,26 +42,59 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
 
   @override
   void dispose() {
+    _recordTimer?.cancel();
     _controller.dispose();
     _focusNode.dispose();
     _audioRecorder.dispose();
     super.dispose();
   }
 
+  String _formatSeconds(int total) {
+    final minutes = total ~/ 60;
+    final seconds = (total % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
   Future<void> _startRecording() async {
     if (await _audioRecorder.hasPermission()) {
-      setState(() => _isRecording = true);
-      // In a real app we'd specify a path. Using default temp path for mock.
-      await _audioRecorder.start(const RecordConfig(), path: '');
+      final path =
+          '${Directory.systemTemp.path}${Platform.pathSeparator}zedu-voice-${DateTime.now().millisecondsSinceEpoch}.m4a';
+      _activeRecordingPath = path;
+      try {
+        await _audioRecorder.start(const RecordConfig(), path: path);
+        appRecordedPaths.add(path);
+      } catch (_) {
+        _activeRecordingPath = null;
+        return;
+      }
+      _recordTimer?.cancel();
+      _recordTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() => _recordSeconds++);
+      });
+      setState(() {
+        _isRecording = true;
+        _recordSeconds = 0;
+      });
     }
   }
 
   Future<void> _stopRecording() async {
-    final path = await _audioRecorder.stop();
+    _recordTimer?.cancel();
+    String? path;
+    try {
+      path = await _audioRecorder.stop();
+    } catch (_) {
+      path = _activeRecordingPath;
+    }
+    _activeRecordingPath = null;
     setState(() {
       _isRecording = false;
       if (path != null) {
-        _controller.text = '[Voice Note Attached]';
+        _voiceNote = XFile(
+          path,
+          name: 'voice-message-${DateTime.now().millisecondsSinceEpoch}.m4a',
+          mimeType: 'audio/mp4',
+        );
       }
     });
   }
@@ -147,7 +184,7 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
 
   void _handleSend() {
     final text = _controller.text.trim();
-    if (text.isEmpty && _attachedFiles.isEmpty) return;
+    if (text.isEmpty && _attachedFiles.isEmpty && _voiceNote == null) return;
 
     String finalMessage = text;
     if (_attachedFiles.isNotEmpty) {
@@ -156,11 +193,19 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
           .join(' ');
       finalMessage = text.isEmpty ? attachmentsStr : '$text\n$attachmentsStr';
     }
+    final voiceNote = _voiceNote;
+    if (voiceNote != null) {
+      final voiceStr = '[Voice Note: ${voiceNote.path}]';
+      finalMessage = finalMessage.isEmpty
+          ? voiceStr
+          : '$finalMessage\n$voiceStr';
+    }
 
     widget.onSend(finalMessage);
     _controller.clear();
     setState(() {
       _attachedFiles.clear();
+      _voiceNote = null;
       _isRecording = false;
       _showMentions = false;
     });
@@ -420,7 +465,9 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
                     ),
                   ),
                 ),
-                if (_controller.text.isEmpty && !_isRecording)
+                if (_controller.text.isEmpty &&
+                    !_isRecording &&
+                    _voiceNote == null)
                   IconButton(
                     onPressed: _startRecording,
                     icon: Icon(Icons.mic_none, color: colors.textHint),
@@ -431,7 +478,7 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
                   Row(
                     children: [
                       Text(
-                        'Recording... 0:05',
+                        'Recording... ${_formatSeconds(_recordSeconds)}',
                         style: TextStyle(color: colors.error, fontSize: 12),
                       ),
                       IconButton(
@@ -439,6 +486,25 @@ class _MessageComposerState extends ConsumerState<MessageComposer> {
                         icon: Icon(Icons.stop_circle, color: colors.error),
                         splashRadius: 20,
                         tooltip: 'Stop recording',
+                      ),
+                    ],
+                  )
+                else if (_voiceNote != null && _controller.text.isEmpty)
+                  Row(
+                    children: [
+                      Text(
+                        'Voice note ready',
+                        style: TextStyle(color: colors.textHint, fontSize: 12),
+                      ),
+                      IconButton(
+                        onPressed: () {
+                          setState(() {
+                            _voiceNote = null;
+                          });
+                        },
+                        icon: Icon(Icons.close, color: colors.textHint),
+                        splashRadius: 20,
+                        tooltip: 'Discard voice note',
                       ),
                     ],
                   )

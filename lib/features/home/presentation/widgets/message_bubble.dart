@@ -1,3 +1,5 @@
+import 'package:audioplayers/audioplayers.dart'
+    show AudioPlayer, DeviceFileSource;
 import 'package:zedu/core/core.dart';
 
 class MessageBubble extends StatefulWidget {
@@ -216,6 +218,11 @@ class _MessageBody extends StatelessWidget {
     final colors = context.colors;
 
     if (text.contains('[Voice Note Attached]')) {
+      final voicePathMatch = RegExp(r'\[Voice Note: (.*?)\]').firstMatch(text);
+      final voicePath = voicePathMatch?.group(1);
+      if (voicePath != null && voicePath.isNotEmpty) {
+        return _VoiceNotePlayer(path: voicePath);
+      }
       return Container(
         margin: const EdgeInsets.only(top: 4),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -232,22 +239,8 @@ class _MessageBody extends StatelessWidget {
               height: 20,
               width: 100,
               decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: const AssetImage('assets/pngs/waveform_mock.png'),
-                  fit: BoxFit.cover,
-                  colorFilter: ColorFilter.mode(
-                    colors.primary,
-                    BlendMode.srcIn,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '0:05',
-              style: TextStyle(
-                color: colors.primary,
-                fontWeight: FontWeight.bold,
+                color: colors.primary.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(4),
               ),
             ),
           ],
@@ -397,5 +390,139 @@ class _MessageBody extends StatelessWidget {
     }
 
     return markdownWidget;
+  }
+}
+
+class _VoiceNotePlayer extends StatefulWidget {
+  final String path;
+
+  const _VoiceNotePlayer({required this.path});
+
+  @override
+  State<_VoiceNotePlayer> createState() => _VoiceNotePlayerState();
+}
+
+class _VoiceNotePlayerState extends State<_VoiceNotePlayer> {
+  AudioPlayer? _player;
+  Duration? _duration;
+  Duration _position = Duration.zero;
+  bool _playing = false;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _prepare();
+  }
+
+  Future<void> _prepare() async {
+    try {
+      final player = AudioPlayer();
+      _player = player;
+      player.onPlayerComplete.listen((_) {
+        if (mounted) {
+          setState(() {
+            _playing = false;
+            _position = Duration.zero;
+          });
+        }
+      });
+      player.onPositionChanged.listen((position) {
+        if (mounted) setState(() => _position = position);
+      });
+      await player.setSource(DeviceFileSource(widget.path));
+      final duration = await player.getDuration();
+      if (mounted) {
+        setState(() {
+          _duration = duration;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _togglePlayback() async {
+    final player = _player;
+    if (player == null || _loading) return;
+    try {
+      if (_playing) {
+        await player.pause();
+        if (mounted) setState(() => _playing = false);
+      } else {
+        await player.resume();
+        if (mounted) setState(() => _playing = true);
+      }
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _player?.dispose();
+    super.dispose();
+  }
+
+  String _format(Duration duration) {
+    final minutes = duration.inMinutes;
+    final seconds = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final duration = _duration;
+    final fraction = duration != null && duration.inMilliseconds > 0
+        ? (_position.inMilliseconds / duration.inMilliseconds)
+              .clamp(0.0, 1.0)
+              .toDouble()
+        : 0.0;
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: colors.primary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            onPressed: _loading ? null : _togglePlayback,
+            icon: Icon(
+              _playing ? Icons.pause_circle_filled : Icons.play_circle_fill,
+              color: colors.primary,
+              size: 28,
+            ),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            tooltip: _playing ? 'Pause voice note' : 'Play voice note',
+          ),
+          const SizedBox(width: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: Container(
+              height: 6,
+              width: 100,
+              color: colors.primary.withValues(alpha: 0.2),
+              alignment: Alignment.centerLeft,
+              child: FractionallySizedBox(
+                widthFactor: fraction,
+                child: Container(color: colors.primary),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _playing ? _format(_position) : _format(duration ?? _position),
+            style: TextStyle(
+              color: colors.primary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
