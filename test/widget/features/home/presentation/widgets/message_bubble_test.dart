@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zedu/core/theme/app_theme.dart';
@@ -7,6 +8,21 @@ Widget _wrap(Widget child) {
   return MaterialApp(
     theme: AppTheme.light,
     home: Scaffold(body: SingleChildScrollView(child: child)),
+  );
+}
+
+Widget _wrapBottomRight(Widget child) {
+  return MaterialApp(
+    theme: AppTheme.light,
+    home: Scaffold(
+      body: Align(
+        alignment: Alignment.bottomRight,
+        child: Padding(
+          padding: const EdgeInsets.all(80),
+          child: SizedBox(width: 420, child: child),
+        ),
+      ),
+    ),
   );
 }
 
@@ -76,6 +92,55 @@ void main() {
       );
 
       expect(find.text('?'), findsOneWidget);
+    });
+  });
+
+  group('MessageBubble reaction picker', () {
+    testWidgets('opens next to the reaction button, not at a fixed point', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrapBottomRight(
+          const MessageBubble(
+            author: 'Ada',
+            text: 'Hello world',
+            timestamp: '10:00',
+          ),
+        ),
+      );
+
+      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await gesture.addPointer(location: Offset.zero);
+      addTearDown(gesture.removePointer);
+      await tester.pump();
+      await gesture.moveTo(tester.getCenter(find.byType(MessageBubble)));
+      await tester.pumpAndSettle();
+
+      final button = find.byKey(const ValueKey('add-reaction-button'));
+      expect(button, findsOneWidget);
+      final buttonRect = tester.getRect(button);
+
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+
+      final menuItem = find.byType(PopupMenuItem<String>).first;
+      expect(menuItem, findsOneWidget);
+      final menuRect = tester.getRect(menuItem);
+      final windowSize =
+          tester.view.physicalSize / tester.view.devicePixelRatio;
+
+      expect((menuRect.left - buttonRect.left).abs(), lessThan(300));
+      expect((menuRect.top - buttonRect.top).abs(), lessThan(350));
+      expect(menuRect.left, greaterThanOrEqualTo(0));
+      expect(menuRect.top, greaterThanOrEqualTo(0));
+      expect(menuRect.right, lessThanOrEqualTo(windowSize.width));
+      expect(menuRect.bottom, lessThanOrEqualTo(windowSize.height));
+
+      await tester.tap(find.text('👍').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('👍'), findsOneWidget);
+      expect(find.text('1'), findsOneWidget);
     });
   });
 }
