@@ -231,4 +231,38 @@ void main() {
       expect(find.text(timestamp), findsNothing);
     });
   });
+
+  group('UserManagementSection action labels (Ziki #2320)', () {
+    testWidgets('member row edit and remove buttons name the member', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+
+      await tester.pumpWidget(
+        buildUnderTest(const [
+          TeamMember(
+            id: '1',
+            email: 'ada@example.com',
+            name: 'Ada Lovelace',
+            role: 'Administrator',
+            dateJoined: 'Oct 1, 2026',
+            status: TeamMemberStatus.active,
+          ),
+        ]),
+      );
+      await tester.pumpAndSettle();
+
+      final tooltipMessages = tester
+          .widgetList<Tooltip>(find.byType(Tooltip))
+          .map((tooltip) => tooltip.message)
+          .toList();
+      expect(tooltipMessages, contains('Edit ada@example.com'));
+      expect(tooltipMessages, contains('Remove ada@example.com'));
+
+      expect(find.bySemanticsLabel('Edit ada@example.com'), findsWidgets);
+      expect(find.bySemanticsLabel('Remove ada@example.com'), findsWidgets);
+
+      semantics.dispose();
+    });
+  });
 }
