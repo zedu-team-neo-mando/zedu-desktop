@@ -117,6 +117,10 @@ class ApiBaseService {
     Map<String, String>? headers,
   }) async {
     final normalizedPath = normalizePath(path);
+    final requestHeaders = headersForPath(normalizedPath, headers: headers);
+    if (data is FormData) {
+      requestHeaders.remove('Content-Type');
+    }
     try {
       // Read the body untyped: asking Dio for T lets its own cast throw a
       // TypeError before the response shape can be validated here.
@@ -124,10 +128,7 @@ class ApiBaseService {
         normalizedPath,
         data: data,
         queryParameters: queryParameters,
-        options: Options(
-          method: method,
-          headers: headersForPath(normalizedPath, headers: headers),
-        ),
+        options: Options(method: method, headers: requestHeaders),
       );
 
       final responseData = response.data;
@@ -142,13 +143,9 @@ class ApiBaseService {
       }
 
       if (responseData is! T) {
-        throw ApiFailure(
-          message:
-              'Expected a ${T.toString()} response from $path but got '
-              '${responseData.runtimeType}.',
-          statusCode: response.statusCode,
+        throw ApiFailure.fromParsingError(
+          'expected $T, got ${responseData.runtimeType}',
           path: path,
-          kind: ApiFailureKind.parsing,
         );
       }
 

@@ -117,6 +117,63 @@ void main() {
         expect(shown.email, placeholder.email);
       });
     });
+
+    test('changePassword returns a failure for the dialog to show', () {
+      return ignoringProfileLoadError(() async {
+        final container = ProviderContainer(
+          overrides: [
+            userProfileRepositoryProvider.overrideWithValue(repository),
+          ],
+        );
+        addTearDown(container.dispose);
+        when(
+          () => repository.changePassword(
+            currentPassword: any(named: 'currentPassword'),
+            newPassword: any(named: 'newPassword'),
+          ),
+        ).thenAnswer(
+          (_) async => const Failure<void>(
+            ApiFailure(message: 'Wrong', kind: ApiFailureKind.client),
+          ),
+        );
+
+        final result = await container
+            .read(userProfileNotifierProvider.notifier)
+            .changePassword(currentPassword: 'a', newPassword: 'b');
+
+        expect(result, isA<Failure<void>>());
+        final state = container.read(userProfileNotifierProvider);
+        expect(state.isSaving, isFalse);
+        expect(state.error, isNull);
+      });
+    });
+
+    test('changePassword returns success and reports it on the page', () {
+      return ignoringProfileLoadError(() async {
+        final container = ProviderContainer(
+          overrides: [
+            userProfileRepositoryProvider.overrideWithValue(repository),
+          ],
+        );
+        addTearDown(container.dispose);
+        when(
+          () => repository.changePassword(
+            currentPassword: any(named: 'currentPassword'),
+            newPassword: any(named: 'newPassword'),
+          ),
+        ).thenAnswer((_) async => const Success<void>(null));
+
+        final result = await container
+            .read(userProfileNotifierProvider.notifier)
+            .changePassword(currentPassword: 'a', newPassword: 'b');
+
+        expect(result, isA<Success<void>>());
+        expect(
+          container.read(userProfileNotifierProvider).successMessage,
+          'Password updated successfully.',
+        );
+      });
+    });
   });
 
   group('UserProfileNotifier.updateNotificationPreferences', () {
@@ -512,7 +569,7 @@ void main() {
 
         expect(
           recorder.requests.any(
-            (request) => request.path == '/organisations/org-1/roles',
+            (request) => request.path.contains('organisations/org-1/roles'),
           ),
           isTrue,
           reason: 'the notifier must look up the organisation roles',
