@@ -84,6 +84,18 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
     });
   }
 
+  /// The composer preview says who the message would go to, so it never
+  /// shows a leftover sample name.
+  String _composerHint() {
+    if (_selectedMembers.isEmpty) {
+      return 'Select a recipient above to start messaging...';
+    }
+    if (_selectedMembers.length == 1) {
+      return 'Message @${_getMemberDisplayName(_selectedMembers.first)}';
+    }
+    return 'Message group (${_selectedMembers.length} members)...';
+  }
+
   String _getMemberDisplayName(TeamMember member) {
     final name = member.name?.trim();
     if (name != null && name.isNotEmpty) {
@@ -619,10 +631,10 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
               ],
             ),
             Divider(height: 24, color: colors.divider),
-            const TextField(
+            TextField(
               enabled: false, // Disabled during creation screen
               decoration: InputDecoration(
-                hintText: 'Message Ruby - Social Media Handler',
+                hintText: _composerHint(),
                 border: InputBorder.none,
                 isDense: true,
               ),
