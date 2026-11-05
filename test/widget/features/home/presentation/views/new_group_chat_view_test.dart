@@ -199,4 +199,38 @@ void main() {
       expect(find.text('alice@zedu.chat'), findsNothing);
     }, variant: _desktopPointer);
   });
+
+  testWidgets('the composer hint follows the recipients that were picked', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(buildWidget());
+    await tester.pumpAndSettle();
+
+    String? composerHint() {
+      final field = tester.widget<TextField>(
+        find.byWidgetPredicate((w) => w is TextField && w.enabled == false),
+      );
+      return field.decoration?.hintText;
+    }
+
+    expect(composerHint(), 'Select a recipient above to start messaging...');
+
+    await tester.tap(findSearchField());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('emptyname'));
+    await tester.pumpAndSettle();
+
+    expect(composerHint(), 'Message @emptyname');
+
+    await tester.tap(find.text('Alice Cooper'));
+    await tester.pumpAndSettle();
+
+    expect(composerHint(), 'Message group (2 members)...');
+    expect(find.text('Message Ruby - Social Media Handler'), findsNothing);
+  });
 }
