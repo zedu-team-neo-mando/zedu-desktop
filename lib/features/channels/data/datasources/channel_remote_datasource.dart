@@ -46,18 +46,40 @@ class ChannelRemoteDataSourceImpl implements ChannelRemoteDataSource {
   /// Stops paging a broken or endless member list after this many pages.
   static const maxMemberPages = 50;
 
+  /// Page size for the organisation's channel list (the backend default
+  /// is 20).
+  static const channelPageSize = 100;
+
+  /// Stops paging a broken or endless channel list after this many pages.
+  static const maxChannelPages = 50;
+
   ChannelRemoteDataSourceImpl({required this.apiBaseService});
 
+  /// Every channel in the organisation. The list is paginated, so each page
+  /// is fetched until the last one the server reports, a short page, or the
+  /// page cap; the channels loaded so far are kept in that last case.
   @override
   Future<List<Channel>> fetchChannels(String orgId) async {
-    final response = await apiBaseService.get<Map<String, dynamic>>(
-      path: '/organisations/$orgId/channels',
-    );
-    final data = response.data['data'] as List?;
-    if (data == null) return [];
-    return data
-        .map((e) => Channel.fromJson(e as Map<String, dynamic>))
-        .toList();
+    final channels = <Channel>[];
+    for (var page = 1; page <= maxChannelPages; page++) {
+      final response = await apiBaseService.get<Map<String, dynamic>>(
+        path: '/organisations/$orgId/channels',
+        queryParameters: {'page': page, 'limit': channelPageSize},
+      );
+      final data = response.data['data'] as List?;
+      if (data == null || data.isEmpty) break;
+      channels.addAll(
+        data.map((e) => Channel.fromJson(e as Map<String, dynamic>)),
+      );
+
+      final pagination = response.data['pagination'];
+      final totalPages = pagination is Map ? pagination['total_pages'] : null;
+      final isLast = totalPages is int
+          ? page >= totalPages
+          : data.length < channelPageSize;
+      if (isLast) break;
+    }
+    return channels;
   }
 
   @override
