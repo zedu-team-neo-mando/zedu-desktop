@@ -130,4 +130,41 @@ void main() {
       );
     },
   );
+
+  testWidgets(
+    'displays dynamic contextual placeholder reflecting recipient selection',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(buildWidget());
+      await tester.pumpAndSettle();
+
+      // 1. Initial state (0 recipients)
+      expect(
+        find.text('Select a recipient above to start messaging...'),
+        findsOneWidget,
+      );
+
+      // 2. Select 1 recipient
+      await tester.tap(findSearchField());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('emptyname'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Message @emptyname'), findsOneWidget);
+
+      // 3. Select 2nd recipient
+      await tester.tap(findSearchField());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('whitespace'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Message group (2 members)...'), findsOneWidget);
+    },
+  );
 }
