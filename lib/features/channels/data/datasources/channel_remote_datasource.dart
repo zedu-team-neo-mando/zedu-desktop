@@ -112,8 +112,10 @@ class ChannelRemoteDataSourceImpl implements ChannelRemoteDataSource {
     if (topic != null) data['topic'] = topic;
     if (description != null) data['description'] = description;
 
-    await apiBaseService.put<Map<String, dynamic>>(
-      path: '/channels/$channelId/',
+    // zedu-be updates a channel only through PATCH /channels/:channelId and
+    // ignores fields left out, so only the changed ones are sent.
+    await apiBaseService.patch<Map<String, dynamic>>(
+      path: '/channels/$channelId',
       data: data,
     );
   }

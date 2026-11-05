@@ -78,4 +78,82 @@ void main() {
       );
     });
   });
+
+  group('ChannelRemoteDataSourceImpl.updateChannelTopicOrDescription '
+      '(Ziki #1432)', () {
+    late MockApiBaseService mockApi;
+    late ChannelRemoteDataSourceImpl datasource;
+
+    setUp(() {
+      mockApi = MockApiBaseService();
+      datasource = ChannelRemoteDataSourceImpl(apiBaseService: mockApi);
+      when(
+        () => mockApi.patch<Map<String, dynamic>>(
+          path: any(named: 'path'),
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer(
+        (_) async => const ApiResponseModel<Map<String, dynamic>>(
+          data: {'data': <String, dynamic>{}},
+          statusCode: 200,
+        ),
+      );
+    });
+
+    test('sends PATCH /channels/{id} with only the changed field', () async {
+      await datasource.updateChannelTopicOrDescription(
+        channelId: 'ch-1',
+        topic: 'Release planning',
+      );
+
+      verify(
+        () => mockApi.patch<Map<String, dynamic>>(
+          path: '/channels/ch-1',
+          data: {'topic': 'Release planning'},
+        ),
+      ).called(1);
+      verifyNever(
+        () => mockApi.put<Map<String, dynamic>>(
+          path: any(named: 'path'),
+          data: any(named: 'data'),
+        ),
+      );
+    });
+
+    test('sends both fields when both change', () async {
+      await datasource.updateChannelTopicOrDescription(
+        channelId: 'ch-1',
+        topic: 'Release planning',
+        description: 'Where we plan releases',
+      );
+
+      verify(
+        () => mockApi.patch<Map<String, dynamic>>(
+          path: '/channels/ch-1',
+          data: {
+            'topic': 'Release planning',
+            'description': 'Where we plan releases',
+          },
+        ),
+      ).called(1);
+    });
+
+    test('passes a request failure on to the caller', () async {
+      const failure = ApiFailure(message: 'Channels not found');
+      when(
+        () => mockApi.patch<Map<String, dynamic>>(
+          path: any(named: 'path'),
+          data: any(named: 'data'),
+        ),
+      ).thenThrow(failure);
+
+      await expectLater(
+        datasource.updateChannelTopicOrDescription(
+          channelId: 'ch-1',
+          description: 'x',
+        ),
+        throwsA(failure),
+      );
+    });
+  });
 }
