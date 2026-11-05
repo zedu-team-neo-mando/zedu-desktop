@@ -107,6 +107,64 @@ void main() {
     expect(saved?.country, 'Nigeria');
   });
 
+  group('discarding unsaved changes', () {
+    Finder titleField() => find.descendant(
+      of: find.widgetWithText(AppTextField, 'Title'),
+      matching: find.byType(TextFormField),
+    );
+
+    testWidgets('cancelling a changed form asks before discarding', (
+      tester,
+    ) async {
+      await openDialog(tester, (_) async => null);
+
+      await tester.enterText(titleField(), 'Product Manager');
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Discard changes?'), findsOneWidget);
+      expect(find.text('Edit your profile'), findsOneWidget);
+
+      await tester.tap(find.text('Discard'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Edit your profile'), findsNothing);
+    });
+
+    testWidgets('keeping the draft leaves the dialog open', (tester) async {
+      await openDialog(tester, (_) async => null);
+
+      await tester.enterText(titleField(), 'Product Manager');
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Keep editing'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Discard changes?'), findsNothing);
+      expect(find.text('Edit your profile'), findsOneWidget);
+      expect(
+        tester.widget<TextFormField>(titleField()).controller?.text,
+        'Product Manager',
+      );
+    });
+
+    testWidgets('cancelling an unchanged form closes without asking', (
+      tester,
+    ) async {
+      await openDialog(tester, (_) async => null);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Discard changes?'), findsNothing);
+      expect(find.text('Edit your profile'), findsNothing);
+    });
+  });
+
   group('saving', () {
     Finder titleField() => find.descendant(
       of: find.widgetWithText(AppTextField, 'Title'),

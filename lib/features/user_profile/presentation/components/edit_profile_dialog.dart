@@ -97,8 +97,19 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   late String selectedTimezone;
   late String selectedCountry;
 
+  late final String _initialName;
+  late final String _initialDisplayName;
+  late final String _initialUsername;
+  late final String _initialEmail;
+  late final String _initialPhone;
+  late final String _initialTitle;
+  late final String _initialPronunciation;
+  late final String _initialTimezone;
+  late final String _initialCountry;
+
   bool _saving = false;
   String? _saveError;
+  bool _discardConfirmed = false;
 
   @override
   void initState() {
@@ -115,6 +126,97 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
 
     selectedTimezone = normalizeProfileTimezone(widget.account.timezone);
     selectedCountry = widget.account.country;
+
+    _initialName = nameCtrl.text;
+    _initialDisplayName = displayNameCtrl.text;
+    _initialUsername = usernameCtrl.text;
+    _initialEmail = emailCtrl.text;
+    _initialPhone = phoneCtrl.text;
+    _initialTitle = titleCtrl.text;
+    _initialPronunciation = pronunciationCtrl.text;
+    _initialTimezone = selectedTimezone;
+    _initialCountry = selectedCountry;
+
+    for (final controller in [
+      nameCtrl,
+      displayNameCtrl,
+      usernameCtrl,
+      emailCtrl,
+      phoneCtrl,
+      titleCtrl,
+      pronunciationCtrl,
+    ]) {
+      controller.addListener(_onFieldChanged);
+    }
+  }
+
+  /// Rebuilds the dialog while a field is being edited, so the unsaved-changes
+  /// guard sees the current values.
+  void _onFieldChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// Whether the form differs from the values it was opened with.
+  bool get _isDirty =>
+      nameCtrl.text != _initialName ||
+      displayNameCtrl.text != _initialDisplayName ||
+      usernameCtrl.text != _initialUsername ||
+      emailCtrl.text != _initialEmail ||
+      phoneCtrl.text != _initialPhone ||
+      titleCtrl.text != _initialTitle ||
+      pronunciationCtrl.text != _initialPronunciation ||
+      selectedTimezone != _initialTimezone ||
+      selectedCountry != _initialCountry;
+
+  /// The dialog may close on its own only when nothing would be lost.
+  bool get _canPop => _discardConfirmed || !_isDirty || _saving;
+
+  /// Closes the dialog, asking first when the form has unsaved changes.
+  Future<void> _requestClose() async {
+    if (_canPop) {
+      Navigator.pop(context);
+      return;
+    }
+    final discard = await _confirmDiscard();
+    if (discard != true || !mounted) return;
+    setState(() => _discardConfirmed = true);
+    Navigator.pop(context);
+  }
+
+  /// Asks whether the unsaved changes should be thrown away.
+  Future<bool?> _confirmDiscard() {
+    final colors = context.colors;
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Discard changes?',
+          style: context.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: colors.textPrimary,
+          ),
+        ),
+        content: Text(
+          'Your edits to this profile have not been saved and will be lost.',
+          style: context.textTheme.bodySmall?.copyWith(
+            color: colors.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'Keep editing',
+              style: TextStyle(color: colors.textPrimary),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Discard', style: TextStyle(color: colors.error)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -151,6 +253,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     // Closed with Cancel while saving: nothing left to update or pop.
     if (!mounted) return;
     if (error == null) {
+      setState(() => _discardConfirmed = true);
       Navigator.pop(context);
       return;
     }
@@ -164,420 +267,448 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Container(
-        width: 640,
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.85,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 16, 0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Edit your profile',
-                      style: context.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: colors.textPrimary,
+    return PopScope(
+      canPop: _canPop,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _requestClose();
+      },
+      child: Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Container(
+          width: 640,
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 16, 0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Edit your profile',
+                        style: context.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: colors.textPrimary,
+                        ),
                       ),
                     ),
-                  ),
-                  IconButton(
-                    tooltip: 'Close',
-                    onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.close, color: colors.textHint),
-                  ),
-                ],
+                    IconButton(
+                      tooltip: 'Close',
+                      onPressed: _requestClose,
+                      icon: Icon(Icons.close, color: colors.textHint),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Divider(height: 0, color: colors.divider),
+              const SizedBox(height: 8),
+              Divider(height: 0, color: colors.divider),
 
-            // Scrollable form body
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
-                child: Form(
-                  key: formKey,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Left column — form fields
-                      Expanded(
-                        flex: 3,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            AppTextField(
-                              label: 'Full Name',
-                              controller: nameCtrl,
-                              hint: 'Enter your full name',
-                              validator: (v) => (v == null || v.trim().isEmpty)
-                                  ? 'Name is required'
-                                  : null,
-                            ),
-                            const SizedBox(height: 16),
-                            AppTextField(
-                              label: 'Display Name',
-                              controller: displayNameCtrl,
-                              hint: 'Enter display name',
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                'This could be your first name, or a nickname — however you\'d like people to refer to you.',
-                                style: context.textTheme.bodySmall?.copyWith(
-                                  color: colors.textHint,
-                                ),
+              // Scrollable form body
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+                  child: Form(
+                    key: formKey,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Left column — form fields
+                        Expanded(
+                          flex: 3,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              AppTextField(
+                                label: 'Full Name',
+                                controller: nameCtrl,
+                                hint: 'Enter your full name',
+                                validator: (v) =>
+                                    (v == null || v.trim().isEmpty)
+                                    ? 'Name is required'
+                                    : null,
                               ),
-                            ),
-                            const SizedBox(height: 16),
-                            AppTextField(
-                              label: 'Username',
-                              controller: usernameCtrl,
-                              hint: 'Enter username',
-                            ),
-                            const SizedBox(height: 16),
-                            AppTextField(
-                              label: 'Email',
-                              controller: emailCtrl,
-                              hint: 'Enter your email',
-                              keyboardType: TextInputType.emailAddress,
-                              validator: (v) {
-                                if (v == null || v.trim().isEmpty) {
-                                  return 'Email is required';
-                                }
-                                return Validators.validateEmail(
-                                  context,
-                                  v.trim(),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 16),
-                            AppTextField(
-                              label: 'Phone Number',
-                              controller: phoneCtrl,
-                              hint: '+1 234 567 8900',
-                              keyboardType: TextInputType.phone,
-                            ),
-                            const SizedBox(height: 16),
-                            AppTextField(
-                              label: 'Title',
-                              controller: titleCtrl,
-                              hint: 'e.g. Product Manager',
-                            ),
-                            const SizedBox(height: 16),
-                            AppTextField(
-                              label: 'Name Pronunciation',
-                              controller: pronunciationCtrl,
-                              hint: "e.g. Zoe (pronounced 'zo-ee')",
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                'This could be a phonetic pronunciation, or an example of something your name sounds like.',
-                                style: context.textTheme.bodySmall?.copyWith(
-                                  color: colors.textHint,
-                                ),
+                              const SizedBox(height: 16),
+                              AppTextField(
+                                label: 'Display Name',
+                                controller: displayNameCtrl,
+                                hint: 'Enter display name',
                               ),
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Timezone dropdown
-                            ProfileFieldLabel('Timezone'),
-                            const SizedBox(height: 6),
-                            DropdownButtonFormField<String>(
-                              initialValue: selectedTimezone,
-                              isExpanded: true,
-                              decoration: InputDecoration(
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(6),
-                                  borderSide: BorderSide(color: colors.divider),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(6),
-                                  borderSide: BorderSide(color: colors.divider),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 14,
-                                ),
-                              ),
-                              items: [
-                                if (!_kTimezones.containsKey(selectedTimezone))
-                                  DropdownMenuItem(
-                                    value: selectedTimezone,
-                                    child: Text(
-                                      selectedTimezone,
-                                      style: context.textTheme.bodySmall,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ..._kTimezones.entries.map(
-                                  (tz) => DropdownMenuItem(
-                                    value: tz.key,
-                                    child: Text(
-                                      tz.value,
-                                      style: context.textTheme.bodySmall,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  'This could be your first name, or a nickname — however you\'d like people to refer to you.',
+                                  style: context.textTheme.bodySmall?.copyWith(
+                                    color: colors.textHint,
                                   ),
                                 ),
-                              ],
-                              onChanged: (v) => setState(
-                                () => selectedTimezone = v ?? selectedTimezone,
                               ),
-                            ),
-                            const SizedBox(height: 16),
-
-                            // Country dropdown (searchable)
-                            ProfileFieldLabel('Country'),
-                            const SizedBox(height: 6),
-                            Autocomplete<String>(
-                              initialValue: TextEditingValue(
-                                text: selectedCountry,
+                              const SizedBox(height: 16),
+                              AppTextField(
+                                label: 'Username',
+                                controller: usernameCtrl,
+                                hint: 'Enter username',
                               ),
-                              optionsBuilder: (textEditingValue) {
-                                if (textEditingValue.text.isEmpty) {
-                                  return kCountries;
-                                }
-                                return kCountries.where(
-                                  (c) => c.toLowerCase().contains(
-                                    textEditingValue.text.toLowerCase(),
-                                  ),
-                                );
-                              },
-                              onSelected: (value) {
-                                setState(() => selectedCountry = value);
-                              },
-                              fieldViewBuilder:
-                                  (
+                              const SizedBox(height: 16),
+                              AppTextField(
+                                label: 'Email',
+                                controller: emailCtrl,
+                                hint: 'Enter your email',
+                                keyboardType: TextInputType.emailAddress,
+                                validator: (v) {
+                                  if (v == null || v.trim().isEmpty) {
+                                    return 'Email is required';
+                                  }
+                                  return Validators.validateEmail(
                                     context,
-                                    controller,
-                                    focusNode,
-                                    onFieldSubmitted,
-                                  ) {
-                                    return TextFormField(
-                                      controller: controller,
-                                      focusNode: focusNode,
-                                      onChanged: (value) => selectedCountry =
-                                          _canonicalCountryName(value),
-                                      validator: (value) {
-                                        final country = _canonicalCountryName(
-                                          value ?? '',
-                                        );
-                                        if (country.isEmpty ||
-                                            kCountries.contains(country)) {
-                                          return null;
-                                        }
-                                        return 'Select a country from the list';
-                                      },
-                                      decoration: InputDecoration(
-                                        hintText: 'Search or select a country',
-                                        hintStyle: context.textTheme.bodySmall
-                                            ?.copyWith(color: colors.textHint),
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            6,
-                                          ),
-                                          borderSide: BorderSide(
-                                            color: colors.divider,
-                                          ),
-                                        ),
-                                        enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            6,
-                                          ),
-                                          borderSide: BorderSide(
-                                            color: colors.divider,
-                                          ),
-                                        ),
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 14,
-                                            ),
-                                        suffixIcon: Icon(
-                                          Icons.keyboard_arrow_down,
-                                          color: colors.textHint,
-                                        ),
+                                    v.trim(),
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 16),
+                              AppTextField(
+                                label: 'Phone Number',
+                                controller: phoneCtrl,
+                                hint: '+1 234 567 8900',
+                                keyboardType: TextInputType.phone,
+                              ),
+                              const SizedBox(height: 16),
+                              AppTextField(
+                                label: 'Title',
+                                controller: titleCtrl,
+                                hint: 'e.g. Product Manager',
+                              ),
+                              const SizedBox(height: 16),
+                              AppTextField(
+                                label: 'Name Pronunciation',
+                                controller: pronunciationCtrl,
+                                hint: "e.g. Zoe (pronounced 'zo-ee')",
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  'This could be a phonetic pronunciation, or an example of something your name sounds like.',
+                                  style: context.textTheme.bodySmall?.copyWith(
+                                    color: colors.textHint,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+
+                              // Timezone dropdown
+                              ProfileFieldLabel('Timezone'),
+                              const SizedBox(height: 6),
+                              DropdownButtonFormField<String>(
+                                initialValue: selectedTimezone,
+                                isExpanded: true,
+                                decoration: InputDecoration(
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                    borderSide: BorderSide(
+                                      color: colors.divider,
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(6),
+                                    borderSide: BorderSide(
+                                      color: colors.divider,
+                                    ),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 14,
+                                  ),
+                                ),
+                                items: [
+                                  if (!_kTimezones.containsKey(
+                                    selectedTimezone,
+                                  ))
+                                    DropdownMenuItem(
+                                      value: selectedTimezone,
+                                      child: Text(
+                                        selectedTimezone,
+                                        style: context.textTheme.bodySmall,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                      style: context.textTheme.bodySmall,
-                                      onFieldSubmitted: (_) =>
-                                          onFieldSubmitted(),
-                                    );
-                                  },
-                              optionsViewBuilder:
-                                  (context, onSelected, options) {
-                                    return Align(
-                                      alignment: Alignment.topLeft,
-                                      child: Material(
-                                        elevation: 4,
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: Container(
-                                          width: 360,
-                                          constraints: const BoxConstraints(
-                                            maxHeight: 240,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: colors.background,
+                                    ),
+                                  ..._kTimezones.entries.map(
+                                    (tz) => DropdownMenuItem(
+                                      value: tz.key,
+                                      child: Text(
+                                        tz.value,
+                                        style: context.textTheme.bodySmall,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (v) => setState(
+                                  () =>
+                                      selectedTimezone = v ?? selectedTimezone,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+
+                              // Country dropdown (searchable)
+                              ProfileFieldLabel('Country'),
+                              const SizedBox(height: 6),
+                              Autocomplete<String>(
+                                initialValue: TextEditingValue(
+                                  text: selectedCountry,
+                                ),
+                                optionsBuilder: (textEditingValue) {
+                                  if (textEditingValue.text.isEmpty) {
+                                    return kCountries;
+                                  }
+                                  return kCountries.where(
+                                    (c) => c.toLowerCase().contains(
+                                      textEditingValue.text.toLowerCase(),
+                                    ),
+                                  );
+                                },
+                                onSelected: (value) {
+                                  setState(() => selectedCountry = value);
+                                },
+                                fieldViewBuilder:
+                                    (
+                                      context,
+                                      controller,
+                                      focusNode,
+                                      onFieldSubmitted,
+                                    ) {
+                                      return TextFormField(
+                                        controller: controller,
+                                        focusNode: focusNode,
+                                        onChanged: (value) => setState(
+                                          () => selectedCountry =
+                                              _canonicalCountryName(value),
+                                        ),
+                                        validator: (value) {
+                                          final country = _canonicalCountryName(
+                                            value ?? '',
+                                          );
+                                          if (country.isEmpty ||
+                                              kCountries.contains(country)) {
+                                            return null;
+                                          }
+                                          return 'Select a country from the list';
+                                        },
+                                        decoration: InputDecoration(
+                                          hintText:
+                                              'Search or select a country',
+                                          hintStyle: context.textTheme.bodySmall
+                                              ?.copyWith(
+                                                color: colors.textHint,
+                                              ),
+                                          border: OutlineInputBorder(
                                             borderRadius: BorderRadius.circular(
-                                              8,
+                                              6,
                                             ),
-                                            border: Border.all(
+                                            borderSide: BorderSide(
                                               color: colors.divider,
                                             ),
                                           ),
-                                          child: ListView.builder(
-                                            padding: EdgeInsets.zero,
-                                            shrinkWrap: true,
-                                            itemCount: options.length,
-                                            itemBuilder: (context, index) {
-                                              final option = options.elementAt(
-                                                index,
-                                              );
-                                              return InkWell(
-                                                onTap: () => onSelected(option),
-                                                child: Padding(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 12,
-                                                        vertical: 10,
-                                                      ),
-                                                  child: Text(
-                                                    option,
-                                                    style: context
-                                                        .textTheme
-                                                        .bodySmall,
-                                                  ),
-                                                ),
-                                              );
-                                            },
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: colors.divider,
+                                            ),
+                                          ),
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                                horizontal: 12,
+                                                vertical: 14,
+                                              ),
+                                          suffixIcon: Icon(
+                                            Icons.keyboard_arrow_down,
+                                            color: colors.textHint,
                                           ),
                                         ),
-                                      ),
-                                    );
-                                  },
-                            ),
-                            const SizedBox(height: 16),
-                          ],
+                                        style: context.textTheme.bodySmall,
+                                        onFieldSubmitted: (_) =>
+                                            onFieldSubmitted(),
+                                      );
+                                    },
+                                optionsViewBuilder:
+                                    (context, onSelected, options) {
+                                      return Align(
+                                        alignment: Alignment.topLeft,
+                                        child: Material(
+                                          elevation: 4,
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          child: Container(
+                                            width: 360,
+                                            constraints: const BoxConstraints(
+                                              maxHeight: 240,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: colors.background,
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              border: Border.all(
+                                                color: colors.divider,
+                                              ),
+                                            ),
+                                            child: ListView.builder(
+                                              padding: EdgeInsets.zero,
+                                              shrinkWrap: true,
+                                              itemCount: options.length,
+                                              itemBuilder: (context, index) {
+                                                final option = options
+                                                    .elementAt(index);
+                                                return InkWell(
+                                                  onTap: () =>
+                                                      onSelected(option),
+                                                  child: Padding(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 12,
+                                                          vertical: 10,
+                                                        ),
+                                                    child: Text(
+                                                      option,
+                                                      style: context
+                                                          .textTheme
+                                                          .bodySmall,
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 24),
+                        const SizedBox(width: 24),
 
-                      // Right column — profile photo
-                      Expanded(
-                        flex: 2,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Profile Photo',
-                              style: context.textTheme.labelSmall?.copyWith(
-                                color: colors.textHint,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            Center(
-                              child: Container(
-                                width: 160,
-                                height: 160,
-                                decoration: BoxDecoration(
-                                  color: colors.accent.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  Icons.person,
-                                  size: 80,
-                                  color: colors.accent,
+                        // Right column — profile photo
+                        Expanded(
+                          flex: 2,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Profile Photo',
+                                style: context.textTheme.labelSmall?.copyWith(
+                                  color: colors.textHint,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 12),
-                            Center(
-                              child: TextButton.icon(
-                                onPressed: () {
-                                  // Upload photo placeholder
-                                },
-                                icon: Icon(
-                                  Icons.upload_outlined,
-                                  size: 16,
-                                  color: colors.primary,
+                              const SizedBox(height: 12),
+                              Center(
+                                child: Container(
+                                  width: 160,
+                                  height: 160,
+                                  decoration: BoxDecoration(
+                                    color: colors.accent.withValues(
+                                      alpha: 0.15,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    Icons.person,
+                                    size: 80,
+                                    color: colors.accent,
+                                  ),
                                 ),
-                                label: Text(
-                                  'Upload photo',
-                                  style: context.textTheme.bodySmall?.copyWith(
+                              ),
+                              const SizedBox(height: 12),
+                              Center(
+                                child: TextButton.icon(
+                                  onPressed: () {
+                                    // Upload photo placeholder
+                                  },
+                                  icon: Icon(
+                                    Icons.upload_outlined,
+                                    size: 16,
                                     color: colors.primary,
-                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  label: Text(
+                                    'Upload photo',
+                                    style: context.textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: colors.primary,
+                                          fontWeight: FontWeight.w500,
+                                        ),
                                   ),
                                 ),
                               ),
-                            ),
-                            Center(
-                              child: TextButton(
-                                onPressed: () {
-                                  // Remove photo placeholder
-                                },
-                                child: Text(
-                                  'Remove photo',
-                                  style: context.textTheme.bodySmall?.copyWith(
-                                    color: colors.error,
-                                    fontWeight: FontWeight.w500,
+                              Center(
+                                child: TextButton(
+                                  onPressed: () {
+                                    // Remove photo placeholder
+                                  },
+                                  child: Text(
+                                    'Remove photo',
+                                    style: context.textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: colors.error,
+                                          fontWeight: FontWeight.w500,
+                                        ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
 
-            // Footer
-            Divider(height: 0, color: colors.divider),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (_saveError != null)
-                    Expanded(
-                      child: Text(
-                        _saveError!,
-                        style: context.textTheme.bodySmall?.copyWith(
-                          color: colors.error,
+              // Footer
+              Divider(height: 0, color: colors.divider),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 16,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (_saveError != null)
+                      Expanded(
+                        child: Text(
+                          _saveError!,
+                          style: context.textTheme.bodySmall?.copyWith(
+                            color: colors.error,
+                          ),
                         ),
                       ),
+                    TextButton(
+                      onPressed: _requestClose,
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(color: colors.textPrimary),
+                      ),
                     ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text(
-                      'Cancel',
-                      style: TextStyle(color: colors.textPrimary),
+                    const SizedBox(width: 12),
+                    AppButton(
+                      label: 'Save changes',
+                      expand: false,
+                      height: 40,
+                      loading: _saving,
+                      onPressed: _saving ? null : _save,
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  AppButton(
-                    label: 'Save changes',
-                    expand: false,
-                    height: 40,
-                    loading: _saving,
-                    onPressed: _saving ? null : _save,
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
