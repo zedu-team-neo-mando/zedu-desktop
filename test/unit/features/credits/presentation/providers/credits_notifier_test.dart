@@ -89,7 +89,10 @@ void main() {
         final state = container.read(creditsNotifierProvider);
         expect(state.purchasingPackageId, isNull);
         expect(state.status, fails ? CreditsStatus.error : CreditsStatus.ready);
-        if (fails) expect(state.error, contains('Checkout unavailable'));
+        if (fails) {
+          expect(state.error, isNot(contains('Checkout unavailable')));
+          expect(state.error, 'Something went wrong. Please try again.');
+        }
 
         pending = Completer<Result<CreditCheckoutSession>>();
         final retry = notifier.purchasePackage(
