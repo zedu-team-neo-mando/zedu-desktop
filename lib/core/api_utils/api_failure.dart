@@ -46,8 +46,10 @@ class ApiFailure implements Exception {
     ApiFailureKind.notFound => 'The resource was not found.',
     ApiFailureKind.server =>
       'Something went wrong on our end. Please try again later.',
-    ApiFailureKind.parsing => 'Parsing error: $message',
-    ApiFailureKind.unknown => 'Unknown error: $message',
+    // Parsing and unknown failures carry Dart exception text, so the raw
+    // string has to stop here. message still holds it for the log.
+    ApiFailureKind.parsing => 'Something went wrong. Please try again.',
+    ApiFailureKind.unknown => 'Something went wrong. Please try again.',
     // 4xx client errors carry a structured server message safe to show (e.g. "Invalid credentials")
     ApiFailureKind.client => message,
   };
