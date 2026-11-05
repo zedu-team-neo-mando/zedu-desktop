@@ -425,6 +425,8 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
       final response = await api.post<Map<String, dynamic>>(
         path: '/invite/general',
         data: {'organisation_id': orgId, 'role_id': roleId},
+        // zedu-be builds the link as Referer + 'accept_general_invitation?..'.
+        headers: {'Referer': '${locator<AppConfig>().webBaseUrl}/'},
       );
       final data = response.data['data'] as Map<String, dynamic>?;
       return data?['invitation_link'] as String?;

@@ -469,6 +469,8 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
         'emails': [email],
         'role_id': role,
       },
+      // zedu-be builds the emailed link as Referer + 'accept_org_invitation?..'.
+      headers: {'Referer': '${_config.webBaseUrl}/'},
     );
     final data = response.data['data'] as Map<String, dynamic>;
     final invites = data['invitations'] as List<dynamic>? ?? [];
