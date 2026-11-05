@@ -136,6 +136,7 @@ void main() {
         when(
           () => repository.editMessage(
             any(),
+            messageId: any(named: 'messageId'),
             content: any(named: 'content'),
             threadId: any(named: 'threadId'),
           ),
@@ -196,13 +197,14 @@ void main() {
       container.dispose();
     });
 
-    test('names the edited message with its thread id', () async {
+    test('names the edited message with its id and thread id', () async {
       notifier.messages = [
         {'id': 'local-1', 'thread_id': 't-1', 'content': 'hello'},
       ];
       when(
         () => mockRepository.editMessage(
           any(),
+          messageId: any(named: 'messageId'),
           content: any(named: 'content'),
           threadId: any(named: 'threadId'),
         ),
@@ -213,6 +215,7 @@ void main() {
       verify(
         () => mockRepository.editMessage(
           any(),
+          messageId: 'local-1',
           content: 'edited',
           threadId: 't-1',
         ),
@@ -223,6 +226,7 @@ void main() {
       when(
         () => mockRepository.editMessage(
           any(),
+          messageId: any(named: 'messageId'),
           content: any(named: 'content'),
           threadId: any(named: 'threadId'),
         ),
@@ -233,6 +237,7 @@ void main() {
       verify(
         () => mockRepository.editMessage(
           any(),
+          messageId: 'm1',
           content: 'edited',
           threadId: 'm1',
         ),
@@ -243,6 +248,7 @@ void main() {
       when(
         () => mockRepository.editMessage(
           any(),
+          messageId: any(named: 'messageId'),
           content: any(named: 'content'),
           threadId: any(named: 'threadId'),
         ),
@@ -262,6 +268,7 @@ void main() {
         when(
           () => mockRepository.editMessage(
             any(),
+            messageId: any(named: 'messageId'),
             content: any(named: 'content'),
             threadId: any(named: 'threadId'),
           ),
@@ -282,6 +289,7 @@ void main() {
         when(
           () => mockRepository.editMessage(
             any(),
+            messageId: any(named: 'messageId'),
             content: any(named: 'content'),
             threadId: any(named: 'threadId'),
           ),
@@ -307,6 +315,7 @@ void main() {
         when(
           () => mockRepository.editMessage(
             any(),
+            messageId: any(named: 'messageId'),
             content: any(named: 'content'),
             threadId: any(named: 'threadId'),
           ),
@@ -337,6 +346,7 @@ void main() {
         when(
           () => mockRepository.editMessage(
             any(),
+            messageId: any(named: 'messageId'),
             content: any(named: 'content'),
             threadId: any(named: 'threadId'),
           ),
@@ -367,6 +377,7 @@ void main() {
         when(
           () => mockRepository.editMessage(
             any(),
+            messageId: any(named: 'messageId'),
             content: any(named: 'content'),
             threadId: any(named: 'threadId'),
           ),
@@ -399,6 +410,7 @@ void main() {
       when(
         () => mockRepository.editMessage(
           any(),
+          messageId: any(named: 'messageId'),
           content: any(named: 'content'),
           threadId: any(named: 'threadId'),
         ),

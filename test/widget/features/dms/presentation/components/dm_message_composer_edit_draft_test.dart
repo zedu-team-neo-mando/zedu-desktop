@@ -51,7 +51,12 @@ void main() {
         () => repository.getMessages(any(), page: any(named: 'page')),
       ).thenAnswer((_) async => <Map<String, dynamic>>[]);
       when(
-        () => repository.editMessage(any(), content: any(named: 'content')),
+        () => repository.editMessage(
+          any(),
+          messageId: any(named: 'messageId'),
+          threadId: any(named: 'threadId'),
+          content: any(named: 'content'),
+        ),
       ).thenAnswer((_) async {});
       when(
         () => repository.sendMessage(
@@ -123,7 +128,12 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       verify(
-        () => repository.editMessage(any(), content: 'edited message'),
+        () => repository.editMessage(
+          any(),
+          messageId: any(named: 'messageId'),
+          threadId: any(named: 'threadId'),
+          content: 'edited message',
+        ),
       ).called(1);
       expect(controller(tester).text, 'half a reply');
       expect((await drafts.load('channel-1'))?.text, 'half a reply');

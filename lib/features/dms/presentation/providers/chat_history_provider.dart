@@ -615,8 +615,9 @@ class ChatHistoryNotifier extends ChangeNotifier {
       orElse: () => <String, dynamic>{},
     );
     final baselineContent = original['content'] as String?;
-    // The backend requires thread_id to know which message is being edited.
-    final threadId = (original['thread_id'] ?? original['id'])?.toString();
+    // The backend requires both ids. A top-level message is its own thread
+    // when the server did not send a separate thread id.
+    final threadId = (original['thread_id'] ?? messageId).toString();
 
     messages = messages.map((m) {
       if (m['id'] == messageId) {
@@ -636,8 +637,9 @@ class ChatHistoryNotifier extends ChangeNotifier {
       final repository = ref.read(dmRepositoryProvider);
       await repository.editMessage(
         channelId,
-        content: newContent,
+        messageId: messageId,
         threadId: threadId,
+        content: newContent,
       );
       return true;
     } catch (_) {
