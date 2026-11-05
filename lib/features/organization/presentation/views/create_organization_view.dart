@@ -16,24 +16,6 @@ class _CreateOrganizationViewState
   final _typeController = TextEditingController();
   String? _selectedCountry;
 
-  // Predefined list of countries
-  final List<String> _countries = [
-    'United States',
-    'United Kingdom',
-    'Canada',
-    'Australia',
-    'Nigeria',
-    'India',
-    'Germany',
-    'France',
-    'South Africa',
-    'Kenya',
-    'Brazil',
-    'Japan',
-    'Singapore',
-    'Other',
-  ];
-
   @override
   void dispose() {
     _nameController.dispose();
@@ -266,7 +248,7 @@ class _CreateOrganizationViewState
                             vertical: 16,
                           ),
                         ),
-                        dropdownMenuEntries: _countries
+                        dropdownMenuEntries: kCountries
                             .map(
                               (c) =>
                                   DropdownMenuEntry<String>(value: c, label: c),
