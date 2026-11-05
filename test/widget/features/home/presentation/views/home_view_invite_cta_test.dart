@@ -86,7 +86,8 @@ class _FakeUserProfileNotifier extends UserProfileNotifier {
   UserProfileState build() => const UserProfileState();
 
   @override
-  Future<List<Map<String, dynamic>>> fetchRegisteredUsers() async => [];
+  Future<Result<List<Map<String, dynamic>>>> loadRegisteredUsers() async =>
+      const Success([]);
 
   @override
   Future<String?> generateInviteLink() async {

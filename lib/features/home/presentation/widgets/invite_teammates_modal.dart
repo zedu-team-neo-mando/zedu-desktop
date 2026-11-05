@@ -15,7 +15,8 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
   List<Map<String, dynamic>> _registeredUsers = [];
   List<Map<String, dynamic>> _filteredUsers = [];
   bool _isLoading = false;
-  bool _isAddingEveryone = false;
+  bool _isLoadingUsers = true;
+  bool _usersLoadFailed = false;
   String? _emailError;
 
   @override
@@ -28,12 +29,19 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
 
   Future<void> _loadUsers() async {
     final notifier = ref.read(userProfileNotifierProvider.notifier);
-    final users = await notifier.fetchRegisteredUsers();
-    if (mounted) {
-      setState(() {
-        _registeredUsers = users;
-      });
-    }
+    final result = await notifier.loadRegisteredUsers();
+    if (!mounted) return;
+    setState(() {
+      _isLoadingUsers = false;
+      switch (result) {
+        case Success<List<Map<String, dynamic>>>(:final value):
+          _registeredUsers = value;
+          _usersLoadFailed = false;
+        case Failure<List<Map<String, dynamic>>>():
+          _registeredUsers = [];
+          _usersLoadFailed = true;
+      }
+    });
   }
 
   void _onSearchChanged(String query) {
@@ -150,36 +158,56 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
     }
   }
 
-  Future<void> _addEveryone() async {
-    setState(() => _isAddingEveryone = true);
-    final result = await ref.read(addEveryoneToChannelProvider).call();
-    if (!mounted) return;
-    setState(() => _isAddingEveryone = false);
-
-    switch (result) {
-      case AddEveryoneAdded(:final count, :final channelName):
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Added $count ${count == 1 ? 'person' : 'people'} to #$channelName.',
-            ),
-            backgroundColor: context.colors.success,
-          ),
-        );
-        Navigator.pop(context);
-      case AddEveryoneNobodyToAdd(:final channelName):
-        AppToastService.show(
-          context,
-          type: AppToastType.info,
-          message: 'Everyone in your organisation is already in #$channelName.',
-        );
-      case AddEveryoneFailed(:final message):
-        AppToastService.show(
-          context,
-          type: AppToastType.error,
-          message: message,
-        );
+  /// Selects every registered user who is not already in the invite list.
+  ///
+  /// Existing chips are kept and an email can only ever appear once, so a
+  /// second click adds nobody. When the click cannot do anything useful it says
+  /// which of those states the dialog is in instead of staying silent.
+  void _addEveryone() {
+    if (_isLoadingUsers) {
+      AppToastService.show(
+        context,
+        type: AppToastType.info,
+        message: 'Still loading people. Try again shortly.',
+      );
+      return;
     }
+
+    if (_usersLoadFailed) {
+      AppToastService.show(
+        context,
+        type: AppToastType.error,
+        message:
+            'Could not load the people in your organisation. Close this '
+            'window and open it again to retry.',
+      );
+      return;
+    }
+
+    final selected = _invites
+        .map((invite) => invite['email']!.toLowerCase())
+        .toSet();
+    final newInvites = <Map<String, String?>>[];
+    for (final user in _registeredUsers) {
+      final email = (user['email'] as String?)?.trim() ?? '';
+      if (email.isEmpty) continue;
+      if (!selected.add(email.toLowerCase())) continue;
+      newInvites.add({'email': email, 'userId': user['id'] as String?});
+    }
+
+    if (newInvites.isEmpty) {
+      AppToastService.show(
+        context,
+        type: AppToastType.info,
+        message: 'Everyone in your organisation is already selected.',
+      );
+      return;
+    }
+
+    setState(() {
+      _invites.addAll(newInvites);
+      _filteredUsers = [];
+    });
   }
 
   @override
@@ -383,9 +411,7 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
                       },
                     ),
                     TextButton(
-                      onPressed: _isLoading || _isAddingEveryone
-                          ? null
-                          : _addEveryone,
+                      onPressed: _isLoading ? null : _addEveryone,
                       style: TextButton.styleFrom(
                         backgroundColor: colors.background,
                         foregroundColor: colors.textPrimary,
@@ -398,7 +424,7 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
                         ),
                       ),
                       child: Text(
-                        _isAddingEveryone ? 'Adding…' : 'Add everyone',
+                        'Add everyone',
                         style: const TextStyle(fontWeight: FontWeight.w500),
                       ),
                     ),
