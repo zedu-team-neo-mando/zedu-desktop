@@ -40,6 +40,7 @@ final desktopWindowTitleProvider = Provider<String>((ref) {
   final channels = ref.watch(channelProvider).value ?? const [];
   final dms = ref.watch(dmListProvider).value ?? const [];
   final selectedDm = ref.watch(selectedDmProvider);
+  final groups = ref.watch(groupDmProvider);
 
   String? contextName;
   switch (activeChat.type) {
@@ -82,6 +83,13 @@ final desktopWindowTitleProvider = Provider<String>((ref) {
 
     case ActiveChatType.groupDm:
       contextName = 'Group Chat';
+      for (final group in groups) {
+        if (group.id == activeChat.id) {
+          final name = group.name.trim();
+          if (name.isNotEmpty) contextName = name;
+          break;
+        }
+      }
       break;
 
     case ActiveChatType.channelDirectory:
@@ -113,6 +121,13 @@ final desktopWindowTitleProvider = Provider<String>((ref) {
     }
   }
 
+  for (final group in groups) {
+    final isActive =
+        activeChat.type == ActiveChatType.groupDm && group.id == activeChat.id;
+    if (!isActive) {
+      unreadCount += group.unreadCount;
+    }
+  }
   return formatDesktopWindowTitle(
     contextName: contextName,
     workspaceName: workspace.name,

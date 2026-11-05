@@ -71,6 +71,7 @@ void main() {
     test('defaults to Zedu when unauthenticated', () {
       final container = ProviderContainer(
         overrides: [
+          groupDmProvider.overrideWith(_EmptyGroupDmNotifier.new),
           authNotifierProvider.overrideWith(
             () => _FakeAuthNotifier(
               const AuthState(status: AuthStatus.unauthenticated),
@@ -87,6 +88,7 @@ void main() {
     test('updates title when active channel and workspace are present', () {
       final container = ProviderContainer(
         overrides: [
+          groupDmProvider.overrideWith(_EmptyGroupDmNotifier.new),
           authNotifierProvider.overrideWith(
             () => _FakeAuthNotifier(
               const AuthState(status: AuthStatus.authenticated),
@@ -123,6 +125,7 @@ void main() {
     test('updates title for DM conversation with unread count', () {
       final container = ProviderContainer(
         overrides: [
+          groupDmProvider.overrideWith(_EmptyGroupDmNotifier.new),
           authNotifierProvider.overrideWith(
             () => _FakeAuthNotifier(
               const AuthState(status: AuthStatus.authenticated),
@@ -199,4 +202,9 @@ class _FakeSelectedDmNotifier extends SelectedDmNotifier {
 
   @override
   DmConversation? build() => _initial;
+}
+
+class _EmptyGroupDmNotifier extends GroupDmNotifier {
+  @override
+  List<GroupDM> build() => const [];
 }
