@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -5,6 +7,11 @@ import '../../../../../helpers/helpers.dart';
 
 const _docs = FileFolder(id: 'docs', name: 'docs');
 const _drafts = FileFolder(id: 'drafts', name: 'drafts');
+
+/// A file in the temp folder. On desktop XFile takes its name from the
+/// path, split on the platform's separator, so the path must use it.
+XFile _file(String name) =>
+    XFile('${Directory.systemTemp.path}${Platform.pathSeparator}$name');
 
 void main() {
   late ProviderContainer container;
@@ -69,4 +76,126 @@ void main() {
     expect(state().sort, FilesSort.oldestFirst);
     expect(state().query, before);
   });
+
+  group('uploadFiles', () {
+    late ProviderContainer uploads;
+    late _UploadRepository repository;
+
+    setUp(() {
+      repository = _UploadRepository();
+      uploads = ProviderContainer(
+        overrides: [
+          currentOrgIdProvider.overrideWithValue('org-1'),
+          filesRepositoryProvider.overrideWithValue(repository),
+        ],
+      );
+      addTearDown(uploads.dispose);
+    });
+
+    test('uploads each file and reports the failures', () async {
+      final outcome = await uploads
+          .read(filesActionsProvider.notifier)
+          .uploadFiles([_file('a.png'), _file('bad.pdf'), _file('c.txt')]);
+
+      expect(repository.uploaded, ['a.png', 'bad.pdf', 'c.txt']);
+      expect(outcome.uploaded, 2);
+      expect(outcome.failedNames, ['bad.pdf']);
+      expect(uploads.read(filesActionsProvider).isUploading, isFalse);
+    });
+
+    test('shows the top-level Files tab afterwards', () async {
+      uploads.read(filesProvider.notifier)
+        ..selectView(FilesScope.trash)
+        ..openFolder(_docs)
+        ..setTab(FilesTab.folders);
+
+      await uploads.read(filesActionsProvider.notifier).uploadFiles([
+        _file('a.png'),
+      ]);
+
+      final state = uploads.read(filesProvider);
+      expect(state.view, FilesScope.all);
+      expect(state.folderPath, isEmpty);
+      expect(state.tab, FilesTab.files);
+    });
+  });
+}
+
+class _UploadRepository implements FilesRepository {
+  final uploaded = <String>[];
+
+  @override
+  Future<Result<WorkspaceFile>> uploadFile(XFile file) async {
+    uploaded.add(file.name);
+    return file.name.startsWith('bad')
+        ? const Failure(ApiFailure(message: 'too large'))
+        : Success(WorkspaceFile(id: file.name, name: file.name));
+  }
+
+  @override
+  Future<Result<FilesPage>> fetchFiles(FilesQuery query) async =>
+      const Success(FilesPage(files: []));
+
+  @override
+  Future<Result<FoldersPage>> fetchFolders({
+    required FilesScope view,
+    String? parentId,
+    int page = 1,
+  }) async => const Success(FoldersPage(folders: []));
+
+  @override
+  Future<Result<void>> createFolder({
+    required String name,
+    required String orgId,
+    String? parentId,
+  }) async => const Success(null);
+
+  @override
+  Future<Result<void>> downloadFile({
+    required WorkspaceFile file,
+    required String savePath,
+    void Function(double? progress)? onProgress,
+  }) async => const Success(null);
+
+  @override
+  Future<Result<void>> deleteFile(
+    String fileId, {
+    bool permanent = false,
+  }) async => const Success(null);
+
+  @override
+  Future<Result<void>> renameFile(String fileId, String name) async =>
+      const Success(null);
+
+  @override
+  Future<Result<void>> moveFile(String fileId, String folderId) async =>
+      const Success(null);
+
+  @override
+  Future<Result<FileShareResult>> shareFile({
+    required String fileId,
+    required List<String> recipientIds,
+    required FileSharePermission permission,
+    required FileShareAccess access,
+    String note = '',
+  }) async => const Success(FileShareResult());
+
+  @override
+  Future<Result<Uint8List>> fetchFilePreview(
+    WorkspaceFile file,
+    FilePreviewKind kind,
+  ) async => Success(Uint8List(0));
+
+  @override
+  Future<Result<WorkspaceFile>> fetchFileDetails(String fileId) async =>
+      Success(WorkspaceFile(id: fileId, name: fileId));
+
+  @override
+  Future<Result<Set<String>>> fetchPinnedFileIds() async => const Success({});
+
+  @override
+  Future<Result<void>> pinFile(String fileId) async => const Success(null);
+
+  @override
+  Future<Result<void>> unpinFile(String fileId) async => const Success(null);
 }
