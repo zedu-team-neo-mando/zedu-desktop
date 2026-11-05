@@ -65,4 +65,8 @@ class AppPalette {
     presenceActive: Color(0xFF22C55E),
     presenceAway: Color(0x661E1E1E),
   );
+
+  /// Interim alias so AppPaletteX (extensions.dart) compiles for dark
+  /// brightness; the real dark palette lands with the dark theme work.
+  static const dark = light;
 }
