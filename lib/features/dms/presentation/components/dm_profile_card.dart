@@ -10,7 +10,11 @@ class DmProfileCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final name = conversation.displayName;
-    final nameParts = name.trim().split(RegExp(r'\s+'));
+    final trimmedName = name.trim();
+    final initial = trimmedName.isEmpty
+        ? '?'
+        : trimmedName.characters.first.toUpperCase();
+    final nameParts = trimmedName.split(RegExp(r'\s+'));
     final handle = nameParts.length > 1
         ? '@${nameParts.first}_${nameParts.last}'
         : '@${nameParts.first}';
@@ -28,7 +32,7 @@ class DmProfileCard extends StatelessWidget {
                 : null,
             child: conversation.effectiveAvatarUrl == null
                 ? Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : '?',
+                    initial,
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
