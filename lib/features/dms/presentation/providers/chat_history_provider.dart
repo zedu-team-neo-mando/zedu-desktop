@@ -31,6 +31,14 @@ class ChatHistoryNotifier extends ChangeNotifier {
   /// not put the old text back over the edit.
   final Set<String> _editsInFlight = {};
 
+  /// Set once this notifier is disposed. A first page that lands after that
+  /// must not start a poller that nobody will ever cancel.
+  bool _disposed = false;
+
+  /// True while a poll request is outstanding, so a tick that arrives early
+  /// skips instead of stacking a second request on the same channel.
+  bool _pollInFlight = false;
+
   ChatHistoryNotifier(this.channelId, this.ref) {
     _loadInitial();
   }
@@ -78,6 +86,9 @@ class ChatHistoryNotifier extends ChangeNotifier {
 
   Future<void> _loadInitial() async {
     await _loadFirstPage();
+    // Leaving during the first page disposes this notifier; its teardown has
+    // already run, so a poller started from here would never be cancelled.
+    if (_disposed) return;
     // Start polling for new messages now that the initial load is done.
     _startPolling();
   }
@@ -105,7 +116,7 @@ class ChatHistoryNotifier extends ChangeNotifier {
       loadFailed = true;
     } finally {
       isLoading = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
   }
 
@@ -138,6 +149,7 @@ class ChatHistoryNotifier extends ChangeNotifier {
   }
 
   void _startPolling() {
+    if (_disposed) return;
     // Poll every 10 seconds for new messages.
     _pollingTimer = Stream<int>.periodic(const Duration(seconds: 10), (i) => i)
         .listen((_) {
@@ -148,9 +160,14 @@ class ChatHistoryNotifier extends ChangeNotifier {
   Future<void> _pollForNewMessages() async {
     // Until the history loads, every polled message would look new.
     if (loadFailed) return;
+    // A reply still outstanding means this tick has nothing to add: skip it
+    // rather than stack a second request onto the same channel.
+    if (_pollInFlight) return;
+    _pollInFlight = true;
     try {
       final repository = ref.read(dmRepositoryProvider);
       final fresh = await repository.getMessages(channelId, page: 1);
+      if (_disposed) return;
 
       // A message edited elsewhere keeps its id, so it is not "new": replace
       // its text in place, without a notification or a second copy.
@@ -201,6 +218,8 @@ class ChatHistoryNotifier extends ChangeNotifier {
       if (changed) notifyListeners();
     } catch (_) {
       // Silent — polling failures should not surface to the UI.
+    } finally {
+      _pollInFlight = false;
     }
   }
 
@@ -227,6 +246,7 @@ class ChatHistoryNotifier extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     (_pollingTimer as dynamic)?.cancel();
     // Recordings kept for messages that never sent are no longer needed.
     for (final options in _sendOptions.values) {

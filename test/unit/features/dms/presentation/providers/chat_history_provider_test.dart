@@ -160,6 +160,83 @@ void main() {
         container.dispose();
       }
     });
+
+    testWidgets('never starts a poller for a conversation left mid-load', (
+      tester,
+    ) async {
+      {
+        final firstPage = Completer<List<Map<String, dynamic>>>();
+        var calls = 0;
+        when(
+          () => repository.getMessages(any(), page: any(named: 'page')),
+        ).thenAnswer((_) {
+          calls++;
+          if (calls == 1) return firstPage.future;
+          return Future.value(history('after the poller'));
+        });
+        final container = ProviderContainer(
+          overrides: [
+            authNotifierProvider.overrideWith(_SignedOutAuth.new),
+            dmRepositoryProvider.overrideWithValue(repository),
+          ],
+        );
+        final sub = container.listen(chatHistoryProvider('ch-1'), (_, _) {});
+        sub.read();
+        await tester.pump();
+
+        // The user leaves before the first page has painted, so the teardown
+        // runs while the request is still outstanding.
+        sub.close();
+        await pumpEventQueue();
+
+        firstPage.complete(history('arrived after the leave'));
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 30));
+
+        expect(calls, 1);
+        container.dispose();
+      }
+    });
+
+    testWidgets('skips a tick while a poll request is still running', (
+      tester,
+    ) async {
+      {
+        final pending = Completer<List<Map<String, dynamic>>>();
+        var calls = 0;
+        when(
+          () => repository.getMessages(any(), page: any(named: 'page')),
+        ).thenAnswer((_) {
+          calls++;
+          if (calls == 1) return Future.value(history('same'));
+          if (!pending.isCompleted) return pending.future;
+          return Future.value(history('same'));
+        });
+        final container = ProviderContainer(
+          overrides: [
+            authNotifierProvider.overrideWith(_SignedOutAuth.new),
+            dmRepositoryProvider.overrideWithValue(repository),
+          ],
+        );
+        final notifier = open(container);
+        await tester.pump();
+
+        await tester.pump(const Duration(seconds: 10));
+        await tester.pump(const Duration(seconds: 10));
+
+        expect(calls, 2);
+
+        pending.complete(history('late'));
+        await tester.pump();
+        expect(notifier.messages, isNotEmpty);
+
+        // The guard has to release, or polling would stop for good after one
+        // slow reply.
+        await tester.pump(const Duration(seconds: 10));
+        expect(calls, 3);
+        container.dispose();
+      }
+    });
   });
 
   _deleteTests();
