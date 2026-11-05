@@ -88,7 +88,10 @@ class _FilesSearchFieldState extends State<FilesSearchField> {
     }
     _debounce?.cancel();
     _lastReported = widget.value;
+    // When the workspace changes, the provider resets [search] to '';
+    // clear the controller so no stale token lingers.
     _controller.text = widget.value;
+    _controller.selection = const TextSelection.collapsed(offset: 0);
   }
 
   @override
