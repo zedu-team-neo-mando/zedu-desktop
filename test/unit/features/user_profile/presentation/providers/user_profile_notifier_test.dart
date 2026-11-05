@@ -205,7 +205,7 @@ void main() {
         () => repository.getNotificationPreferences(orgId: any(named: 'orgId')),
       ).thenAnswer((_) async => Success(NotificationPreferences.empty()));
       when(
-        () => repository.getSecuritySessions(),
+        () => repository.getSecuritySessions(userId: any(named: 'userId')),
       ).thenAnswer((_) async => const Success(<SecuritySession>[]));
       when(
         () => repository.getOrganization(orgId: any(named: 'orgId')),
@@ -343,7 +343,7 @@ void main() {
         () => repository.getNotificationPreferences(orgId: any(named: 'orgId')),
       ).thenAnswer((_) async => Success(NotificationPreferences.empty()));
       when(
-        () => repository.getSecuritySessions(),
+        () => repository.getSecuritySessions(userId: any(named: 'userId')),
       ).thenAnswer((_) async => Success(<SecuritySession>[]));
       when(
         () => repository.getOrganization(orgId: any(named: 'orgId')),

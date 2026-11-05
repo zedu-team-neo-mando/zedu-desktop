@@ -610,10 +610,18 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
   }
 
   Future<void> _loadProfile(int loadId, String? orgId) async {
+    // Auth is already running whenever someone is signed in; reading it only
+    // then means a profile load never starts it.
+    final userId = ref.exists(authNotifierProvider)
+        ? ref.read(authNotifierProvider).user?.id
+        : null;
     final results = await Future.wait([
       _repository.getAccount(),
       _repository.getNotificationPreferences(orgId: orgId),
-      _repository.getSecuritySessions(),
+      // Sessions belong to a user; with nobody signed in there are none.
+      userId == null || userId.isEmpty
+          ? Future.value(const Success<List<SecuritySession>>([]))
+          : _repository.getSecuritySessions(userId: userId),
       _repository.getOrganization(orgId: orgId),
       _repository.getTeamMembers(orgId: orgId),
       _repository.getRolesAndPermissions(),

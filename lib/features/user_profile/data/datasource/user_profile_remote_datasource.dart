@@ -14,7 +14,9 @@ abstract interface class UserProfileRemoteDataSource {
     required String? orgId,
     required NotificationPreferences preferences,
   });
-  Future<List<SecuritySessionModel>> getSecuritySessions();
+  Future<List<SecuritySessionModel>> getSecuritySessions({
+    required String userId,
+  });
   Future<void> changePassword({
     required String currentPassword,
     required String newPassword,
@@ -242,14 +244,20 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
   }
 
   @override
-  Future<List<SecuritySessionModel>> getSecuritySessions() async {
+  Future<List<SecuritySessionModel>> getSecuritySessions({
+    required String userId,
+  }) async {
     if (_config.usesMockData) {
       return _sessions.map(SecuritySessionModel.fromJson).toList();
     }
+    // zedu-be serves the sessions at GET /users/:user_id/sessions; there is
+    // no /profile/security/sessions route.
     final response = await _apiBaseService.get<Map<String, dynamic>>(
-      path: '/profile/security/sessions',
+      path: '/users/$userId/sessions',
     );
-    final data = response.data['data'] as List<dynamic>;
+    // No sessions comes back as 204 with no data.
+    final data = response.data['data'];
+    if (data is! List) return const [];
     return data
         .cast<Map<String, dynamic>>()
         .map(SecuritySessionModel.fromJson)
