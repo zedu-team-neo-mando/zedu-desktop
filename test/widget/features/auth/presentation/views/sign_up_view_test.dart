@@ -6,7 +6,7 @@ import 'package:zedu/features/features.dart';
 
 // Fake notifier that avoids locator setup while staying type-compatible with
 // authNotifierProvider. Mirrors the real signUp contract: loading while the
-// sign-up → auto-login chain runs, then either authenticated or an error.
+// sign-up ΓåÆ auto-login chain runs, then either authenticated or an error.
 class FakeAuthNotifier extends AuthNotifier {
   FakeAuthNotifier({
     this.failSignUp = false,
@@ -161,6 +161,32 @@ void main() {
       expect(find.text('Sign up failed'), findsOneWidget);
       expect(createAccountButton, findsOneWidget);
       await drainToastTimer(tester);
+    });
+
+    testWidgets('fits the whole form in the default 1280x720 window', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(1280, 720));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        buildSignUpViewUnderTest(notifier: FakeAuthNotifier()),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+
+      // The two social buttons share a row instead of stacking.
+      final google = tester.getRect(find.text('Sign up with Google'));
+      final apple = tester.getRect(find.text('Sign up with Apple'));
+      expect((google.center.dy - apple.center.dy).abs(), lessThan(1));
+      expect(google.right, lessThan(apple.left));
+
+      // The terms text, the last item in the column, is visible without
+      // scrolling at the default window height.
+      final terms = tester.getRect(
+        find.textContaining('By signing up', findRichText: true),
+      );
+      expect(terms.bottom, lessThanOrEqualTo(720));
     });
   });
 }
