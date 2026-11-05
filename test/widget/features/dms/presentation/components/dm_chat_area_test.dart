@@ -246,6 +246,12 @@ void main() {
       when(
         () => repository.getMessages(any(), page: any(named: 'page')),
       ).thenAnswer((_) async => messages);
+      when(
+        () => repository.getThreadReplies(
+          channelId: any(named: 'channelId'),
+          threadId: any(named: 'threadId'),
+        ),
+      ).thenAnswer((_) async => const []);
       final storage = MockSecureStorageService();
       when(() => storage.readData(any())).thenAnswer((_) async => null);
 
@@ -483,6 +489,26 @@ void main() {
       await searchFor(tester, 'tom & jerry');
 
       expect(searchResult('Tom & Jerry <3'), findsOneWidget);
+    });
+
+    testWidgets('Reply in thread opens that message thread beside the chat', (
+      tester,
+    ) async {
+      await pumpChat(tester, [
+        {...message('m1', '<p>Can you review this?</p>'), 'thread_id': 't-1'},
+      ]);
+
+      await tester.tap(find.byTooltip('Reply in thread'));
+      await tester.pumpAndSettle();
+
+      final panel = tester.widget<ThreadPanel>(find.byType(ThreadPanel));
+      expect(panel.channelId, 'ch-1');
+      expect(panel.threadId, 't-1');
+      expect(panel.parentMessage, 'Can you review this?');
+
+      await tester.tap(find.byTooltip('Close thread'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ThreadPanel), findsNothing);
     });
 
     testWidgets('opens the message menu on long press', (tester) async {
