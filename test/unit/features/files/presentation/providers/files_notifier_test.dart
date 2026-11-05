@@ -191,6 +191,10 @@ class _UploadRepository implements FilesRepository {
       Success(WorkspaceFile(id: fileId, name: fileId));
 
   @override
+  Future<Result<WorkspaceFileInfo>> fetchFileInfo(String fileId) async =>
+      Success(WorkspaceFileInfo());
+
+  @override
   Future<Result<Set<String>>> fetchPinnedFileIds() async => const Success({});
 
   @override
