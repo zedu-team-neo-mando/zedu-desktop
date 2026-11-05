@@ -36,6 +36,8 @@ class SecureStorageService {
 
   Future<void> deleteValue(String key) => _storage.delete(key: key);
 
+  Future<Map<String, String>> readAllData() => _storage.readAll();
+
   Future<void> clearAll() async {
     _sessionToken = null;
     await _storage.deleteAll();
