@@ -10,7 +10,7 @@ abstract class FilesRemoteDataSource {
     int page = 1,
   });
 
-  Future<WorkspaceFile> uploadFile(XFile file);
+  Future<WorkspaceFile> uploadFile(XFile file, {String? parentId});
 
   Future<void> createFolder({
     required String name,
@@ -154,9 +154,10 @@ class FilesRemoteDataSourceImpl implements FilesRemoteDataSource {
   }
 
   /// Sends one file as the `files` part, as the web app does. The server
-  /// files it at the top level of the user's files.
+  /// files it inside [parentId], or at the top level when that is null or
+  /// empty.
   @override
-  Future<WorkspaceFile> uploadFile(XFile file) async {
+  Future<WorkspaceFile> uploadFile(XFile file, {String? parentId}) async {
     final mime = file.mimeType;
     final type = mime != null && mime.contains('/')
         ? DioMediaType.parse(mime)
@@ -178,6 +179,10 @@ class FilesRemoteDataSourceImpl implements FilesRemoteDataSource {
                 ),
         ),
       );
+
+    if (parentId != null && parentId.isNotEmpty) {
+      formData.fields.add(MapEntry('parent_id', parentId));
+    }
 
     final response = await apiBaseService.post<Map<String, dynamic>>(
       path: '/files/upload-files',

@@ -103,6 +103,21 @@ void main() {
       expect(uploads.read(filesActionsProvider).isUploading, isFalse);
     });
 
+    test('uploads into the open folder and stays there', () async {
+      uploads.read(filesProvider.notifier)
+        ..openFolder(_docs)
+        ..setTab(FilesTab.folders);
+
+      await uploads.read(filesActionsProvider.notifier).uploadFiles([
+        _file('a.png'),
+      ]);
+
+      expect(repository.uploadedTo.single, 'docs');
+      final state = uploads.read(filesProvider);
+      expect(state.folderPath, [_docs]);
+      expect(state.tab, FilesTab.files);
+    });
+
     test('shows the top-level Files tab afterwards', () async {
       uploads.read(filesProvider.notifier)
         ..selectView(FilesScope.trash)
@@ -123,10 +138,15 @@ void main() {
 
 class _UploadRepository implements FilesRepository {
   final uploaded = <String>[];
+  final uploadedTo = <String?>[];
 
   @override
-  Future<Result<WorkspaceFile>> uploadFile(XFile file) async {
+  Future<Result<WorkspaceFile>> uploadFile(
+    XFile file, {
+    String? parentId,
+  }) async {
     uploaded.add(file.name);
+    uploadedTo.add(parentId);
     return file.name.startsWith('bad')
         ? const Failure(ApiFailure(message: 'too large'))
         : Success(WorkspaceFile(id: file.name, name: file.name));

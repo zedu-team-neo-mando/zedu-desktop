@@ -12,7 +12,7 @@ abstract class FilesRepository {
   });
 
   /// Uploads [file] to the signed-in user's files.
-  Future<Result<WorkspaceFile>> uploadFile(XFile file);
+  Future<Result<WorkspaceFile>> uploadFile(XFile file, {String? parentId});
 
   /// Creates a folder inside [parentId], or at the top level when null.
   Future<Result<void>> createFolder({
