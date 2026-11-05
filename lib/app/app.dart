@@ -11,12 +11,14 @@ class App extends ConsumerWidget {
       title: kIsWeb ? 'Zedu | Team Messaging & Collaboration' : 'Zedu',
       theme: AppTheme.light,
       routerConfig: AppRouter.router,
-      builder: (context, child) => DesktopWindowTitleListener(
-        child: CreditsPaymentDeepLinkListener(
-          child: AuthDeepLinkListener(
-            child: SessionExpiryListener(
-              child: QuickSwitcherShortcut(
-                child: child ?? const SizedBox.shrink(),
+      builder: (context, child) => DmIncomingWatcherListener(
+        child: DesktopWindowTitleListener(
+          child: CreditsPaymentDeepLinkListener(
+            child: AuthDeepLinkListener(
+              child: SessionExpiryListener(
+                child: QuickSwitcherShortcut(
+                  child: child ?? const SizedBox.shrink(),
+                ),
               ),
             ),
           ),
