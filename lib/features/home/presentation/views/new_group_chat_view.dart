@@ -91,6 +91,17 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
     return 'Member';
   }
 
+  String _getComposerPlaceholder() {
+    if (_selectedMembers.isEmpty) {
+      return 'Select a recipient above to start messaging...';
+    }
+    if (_selectedMembers.length == 1) {
+      final name = _getMemberDisplayName(_selectedMembers.first);
+      return 'Message @$name';
+    }
+    return 'Message group (${_selectedMembers.length} members)...';
+  }
+
   String _getMemberInitials(String displayName) {
     final clean = displayName.trim();
     if (clean.isEmpty) return '?';
@@ -586,12 +597,14 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
   }
 
   Widget _buildBottomMessageEditor(AppPalette colors) {
+    final placeholder = _getComposerPlaceholder();
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-      decoration: const BoxDecoration(color: Colors.white),
+      decoration: BoxDecoration(color: colors.onPrimary),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
+          color: colors.onPrimary,
           border: Border.all(color: colors.divider),
           borderRadius: BorderRadius.circular(12),
         ),
@@ -611,10 +624,11 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
               ],
             ),
             Divider(height: 24, color: colors.divider),
-            const TextField(
+            TextField(
               enabled: false, // Disabled during creation screen
               decoration: InputDecoration(
-                hintText: 'Message Ruby - Social Media Handler',
+                hintText: placeholder,
+                hintStyle: TextStyle(color: colors.textHint),
                 border: InputBorder.none,
                 isDense: true,
               ),
