@@ -208,6 +208,10 @@ class _SetStatusDialogState extends ConsumerState<SetStatusDialog> {
                           color: colors.textPrimary,
                         ),
                         maxLength: 100,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) {
+                          if (!_isSaving) _save();
+                        },
                         // Rebuild so the clear button and the selected suggestion follow the text.
                         onChanged: (_) => setState(() {}),
                         buildCounter:
