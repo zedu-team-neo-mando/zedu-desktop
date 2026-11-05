@@ -17,6 +17,10 @@ abstract class FilesRemoteDataSource {
     required String orgId,
     String? parentId,
   });
+
+  /// What `GET /files/file/{id}/info` says about the file, including the
+  /// channels it was shared in.
+  Future<WorkspaceFileInfo> fetchFileInfo(String fileId);
 }
 
 /// Reads `current_page` and `total_pages_count` (or `total_pages`).
@@ -157,5 +161,20 @@ class FilesRemoteDataSourceImpl implements FilesRemoteDataSource {
         'organisation_id': orgId,
       },
     );
+  }
+
+  @override
+  Future<WorkspaceFileInfo> fetchFileInfo(String fileId) async {
+    final path = '/files/file/$fileId/info';
+    final response = await apiBaseService.get<Map<String, dynamic>>(path: path);
+    final data = response.data['data'];
+    if (data is! Map) {
+      throw ApiFailure(
+        message: 'File info missing from the response.',
+        path: path,
+        kind: ApiFailureKind.parsing,
+      );
+    }
+    return WorkspaceFileInfo.fromJson(Map<String, dynamic>.from(data));
   }
 }

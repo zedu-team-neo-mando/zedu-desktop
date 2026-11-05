@@ -20,4 +20,8 @@ abstract class FilesRepository {
     required String orgId,
     String? parentId,
   });
+
+  /// [fileId]'s info, including the channels it was shared in. The files list
+  /// does not carry that, so it comes from its own route.
+  Future<Result<WorkspaceFileInfo>> fetchFileInfo(String fileId);
 }

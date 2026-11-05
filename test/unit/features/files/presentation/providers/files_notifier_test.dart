@@ -213,6 +213,10 @@ class _UploadRepository implements FilesRepository {
   final uploaded = <String>[];
 
   @override
+  Future<Result<WorkspaceFileInfo>> fetchFileInfo(String fileId) async =>
+      Success(WorkspaceFileInfo());
+
+  @override
   Future<Result<WorkspaceFile>> uploadFile(XFile file) async {
     uploaded.add(file.name);
     return file.name.startsWith('bad')

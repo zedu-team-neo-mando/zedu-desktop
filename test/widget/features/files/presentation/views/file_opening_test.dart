@@ -20,6 +20,10 @@ class _Repository implements FilesRepository {
   final String link;
 
   @override
+  Future<Result<WorkspaceFileInfo>> fetchFileInfo(String fileId) async =>
+      Success(WorkspaceFileInfo());
+
+  @override
   Future<Result<FilesPage>> fetchFiles(FilesQuery query) async => Success(
     FilesPage(
       files: [WorkspaceFile(id: 'file-1', name: 'report.pdf', link: link)],

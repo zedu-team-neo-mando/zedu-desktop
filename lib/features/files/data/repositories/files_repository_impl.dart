@@ -55,6 +55,10 @@ class FilesRepositoryImpl implements FilesRepository {
     ),
   );
 
+  @override
+  Future<Result<WorkspaceFileInfo>> fetchFileInfo(String fileId) =>
+      _guard(() => remoteDataSource.fetchFileInfo(fileId));
+
   Future<Result<T>> _guard<T>(Future<T> Function() call) async {
     try {
       return Success(await call());

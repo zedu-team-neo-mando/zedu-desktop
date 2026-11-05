@@ -39,6 +39,10 @@ class _FakeFilesRepository implements FilesRepository {
   final createdFolders = <(String, String, String?)>[];
 
   @override
+  Future<Result<WorkspaceFileInfo>> fetchFileInfo(String fileId) async =>
+      Success(WorkspaceFileInfo());
+
+  @override
   Future<Result<FilesPage>> fetchFiles(FilesQuery query) async {
     queries.add(query);
     if (query.folderId == 'docs') {
