@@ -141,6 +141,18 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   bool _saving = false;
   String? _saveError;
 
+  late final String _initialName;
+  late final String _initialDisplayName;
+  late final String _initialUsername;
+  late final String _initialEmail;
+  late final String _initialPhone;
+  late final String _initialTitle;
+  late final String _initialPronunciation;
+  late final String _initialTimezone;
+  late final String _initialCountry;
+
+  bool _discardConfirmed = false;
+
   /// The saved photo's link, or null once it is removed.
   String? _photoUrl;
 
@@ -237,10 +249,112 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     selectedTimezone = normalizeProfileTimezone(widget.account.timezone);
     selectedCountry = widget.account.country;
     _photoUrl = widget.account.avatarUrl;
+
+    _initialName = nameCtrl.text;
+    _initialDisplayName = displayNameCtrl.text;
+    _initialUsername = usernameCtrl.text;
+    _initialEmail = emailCtrl.text;
+    _initialPhone = phoneCtrl.text;
+    _initialTitle = titleCtrl.text;
+    _initialPronunciation = pronunciationCtrl.text;
+    _initialTimezone = selectedTimezone;
+    _initialCountry = selectedCountry;
+
+    for (final controller in [
+      nameCtrl,
+      displayNameCtrl,
+      usernameCtrl,
+      emailCtrl,
+      phoneCtrl,
+      titleCtrl,
+      pronunciationCtrl,
+    ]) {
+      controller.addListener(_onFieldChanged);
+    }
+  }
+
+  /// Rebuilds the dialog while a field is being edited, so the unsaved-changes
+  /// guard sees the current values.
+  void _onFieldChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// Whether the form differs from the values it was opened with.
+  bool get _isDirty =>
+      nameCtrl.text != _initialName ||
+      displayNameCtrl.text != _initialDisplayName ||
+      usernameCtrl.text != _initialUsername ||
+      emailCtrl.text != _initialEmail ||
+      phoneCtrl.text != _initialPhone ||
+      titleCtrl.text != _initialTitle ||
+      pronunciationCtrl.text != _initialPronunciation ||
+      selectedTimezone != _initialTimezone ||
+      selectedCountry != _initialCountry;
+
+  /// The dialog may close on its own only when nothing would be lost.
+  bool get _canPop => _discardConfirmed || !_isDirty || _saving;
+
+  /// Closes the dialog, asking first when the form has unsaved changes.
+  Future<void> _requestClose() async {
+    if (_canPop) {
+      Navigator.pop(context);
+      return;
+    }
+    final discard = await _confirmDiscard();
+    if (discard != true || !mounted) return;
+    setState(() => _discardConfirmed = true);
+    Navigator.pop(context);
+  }
+
+  /// Asks whether the unsaved changes should be thrown away.
+  Future<bool?> _confirmDiscard() {
+    final colors = context.colors;
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Discard changes?',
+          style: context.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+            color: colors.textPrimary,
+          ),
+        ),
+        content: Text(
+          'Your edits to this profile have not been saved and will be lost.',
+          style: context.textTheme.bodySmall?.copyWith(
+            color: colors.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'Keep editing',
+              style: TextStyle(color: colors.textPrimary),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Discard', style: TextStyle(color: colors.error)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   void dispose() {
+    for (final controller in [
+      nameCtrl,
+      displayNameCtrl,
+      usernameCtrl,
+      emailCtrl,
+      phoneCtrl,
+      titleCtrl,
+      pronunciationCtrl,
+    ]) {
+      controller.removeListener(_onFieldChanged);
+    }
     nameCtrl.dispose();
     displayNameCtrl.dispose();
     usernameCtrl.dispose();
@@ -286,7 +400,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Dialog(
+    final dialog = Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Container(
         width: 640,
@@ -312,7 +426,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                   ),
                   IconButton(
                     tooltip: 'Close',
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: _requestClose,
                     icon: Icon(Icons.close, color: colors.textHint),
                   ),
                 ],
@@ -721,7 +835,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                       ),
                     ),
                   TextButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: _requestClose,
                     child: Text(
                       'Cancel',
                       style: TextStyle(color: colors.textPrimary),
@@ -741,6 +855,15 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
           ],
         ),
       ),
+    );
+
+    return PopScope(
+      canPop: _canPop,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _requestClose();
+      },
+      child: dialog,
     );
   }
 }
