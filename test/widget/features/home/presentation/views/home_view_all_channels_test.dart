@@ -16,6 +16,13 @@ class _FakeCreditsNotifier extends CreditsNotifier {
   Future<void> load({String? orgId}) async {}
 }
 
+class _FakeWorkspaceNotifier extends WorkspaceNotifier {
+  @override
+  WorkspaceState build() => const WorkspaceState(
+    selectedWorkspace: Workspace(id: 'org-1', name: 'Workspace A', avatar: ''),
+  );
+}
+
 class _FakeChannelNotifier extends ChannelNotifier {
   @override
   Future<List<Channel>> build() async => [
@@ -84,6 +91,7 @@ void main() {
         overrides: [
           authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
           creditsNotifierProvider.overrideWith(_FakeCreditsNotifier.new),
+          workspaceProvider.overrideWith(_FakeWorkspaceNotifier.new),
           channelProvider.overrideWith(_FakeChannelNotifier.new),
           userProfileNotifierProvider.overrideWith(
             _FakeUserProfileNotifier.new,
@@ -159,5 +167,33 @@ void main() {
 
     expect(inkWell.onTap, isNotNull);
     expect(inkWell.hoverColor, isNotNull);
+  });
+
+  testWidgets('the channels chevron collapses and expands the section', (
+    tester,
+  ) async {
+    await pumpHome(tester);
+
+    expect(find.text('general'), findsOneWidget);
+    expect(find.text('random'), findsOneWidget);
+    expect(find.text('View all channels'), findsOneWidget);
+    expect(find.text('Add channel'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('channels-section-toggle')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('general'), findsNothing);
+    expect(find.text('random'), findsNothing);
+    expect(find.text('View all channels'), findsNothing);
+    expect(find.text('Add channel'), findsNothing);
+    expect(find.text('Channels'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('channels-section-toggle')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('general'), findsOneWidget);
+    expect(find.text('random'), findsOneWidget);
+    expect(find.text('View all channels'), findsOneWidget);
+    expect(find.text('Add channel'), findsOneWidget);
   });
 }
