@@ -106,6 +106,11 @@ class _CreateChannelModalState extends ConsumerState<CreateChannelModal> {
             const SizedBox(height: 8),
             TextField(
               controller: _nameController,
+              autofocus: true,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) {
+                if (!_isCreating) _createChannel();
+              },
               onChanged: (_) {
                 if (_errorMessage != null) {
                   setState(() => _errorMessage = null);

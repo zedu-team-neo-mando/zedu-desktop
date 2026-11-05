@@ -182,5 +182,38 @@ void main() {
 
       expect(find.text('Channel name is required'), findsNothing);
     });
+
+    testWidgets('name text field has autofocus enabled', (tester) async {
+      await openModal(tester);
+
+      final textField = tester.widget<TextField>(find.byType(TextField).first);
+      expect(textField.autofocus, isTrue);
+      expect(textField.textInputAction, TextInputAction.done);
+    });
+
+    testWidgets(
+      'submits channel creation when Enter is pressed in name field',
+      (tester) async {
+        await openModal(tester);
+        notifier.result = Success<Channel>(
+          Channel(
+            id: 'c1',
+            name: 'dev-team',
+            description: '',
+            organisationId: 'org-1',
+            ownerId: 'user-1',
+          ),
+        );
+
+        final nameField = find.byType(TextField).first;
+        await tester.enterText(nameField, 'dev-team');
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+
+        expect(notifier.createCalls, 1);
+        expect(find.text('Create a channel'), findsNothing);
+        await drainToastTimer(tester);
+      },
+    );
   });
 }
