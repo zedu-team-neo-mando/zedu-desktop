@@ -29,13 +29,8 @@ class NotificationsDialog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.colors;
-    final dmState = ref.watch(dmListProvider);
-    final deletedIds = ref.watch(
-      dmConversationActionsProvider.select((a) => a.deletedIds),
-    );
-    final unread = (dmState.value ?? const <DmConversation>[])
-        .where((c) => c.unreadCount > 0 && !deletedIds.contains(c.channelId))
-        .toList();
+    final unread = ref.watch(unreadDmsProvider);
+    final isLoading = ref.watch(dmListProvider).isLoading;
 
     return Dialog(
       insetPadding: const EdgeInsets.only(bottom: 80, left: 74),
@@ -79,7 +74,7 @@ class NotificationsDialog extends ConsumerWidget {
               ),
             ),
             Divider(height: 1, color: colors.divider),
-            if (unread.isEmpty && dmState.isLoading)
+            if (unread.isEmpty && isLoading)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 40),
                 child: CircularProgressIndicator(),

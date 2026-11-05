@@ -49,6 +49,11 @@ Future<_FakeProfileNotifier> _pumpPeopleCard(
   return notifier;
 }
 
+class _EmptyDms extends DmListNotifier {
+  @override
+  Future<List<DmConversation>> build() async => const [];
+}
+
 class _FakeAuthNotifier extends AuthNotifier {
   @override
   AuthState build() => AuthState(
@@ -88,6 +93,7 @@ Future<int> _hoverPeopleAndCountLoads(
       overrides: [
         userProfileNotifierProvider.overrideWith(() => notifier),
         authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
+        dmListProvider.overrideWith(_EmptyDms.new),
       ],
       child: buildTestMaterialApp(
         const Scaffold(

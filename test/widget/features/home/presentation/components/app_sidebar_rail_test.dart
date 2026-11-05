@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/rendering.dart';
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
@@ -14,6 +16,7 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
+        overrides: [dmListProvider.overrideWith(_EmptyDms.new)],
         child: MaterialApp(
           theme: AppTheme.light,
           home: const Scaffold(
@@ -72,6 +75,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       ProviderScope(
+        overrides: [dmListProvider.overrideWith(_EmptyDms.new)],
         child: MaterialApp(
           theme: AppTheme.light,
           home: const Scaffold(
@@ -95,4 +99,129 @@ void main() {
       findsOneWidget,
     );
   });
+
+  group('notification bell', () {
+    const dot = Key('sidebarNotificationDot');
+
+    DmConversation conversation(String id, {int unreadCount = 0}) =>
+        DmConversation(
+          channelId: id,
+          username: id,
+          participantId: 'participant-$id',
+          previewMessage: '',
+          unreadCount: unreadCount,
+        );
+
+    Widget shell() => MaterialApp(
+      theme: AppTheme.light,
+      home: const Scaffold(
+        body: SizedBox(
+          width: AppSidebarRail.width,
+          height: 600,
+          child: AppSidebarRail(activeType: HomeSidebarType.home),
+        ),
+      ),
+    );
+
+    testWidgets('shows the unread dot when a DM has unread messages', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dmListProvider.overrideWith(
+              () => _Dms([
+                conversation('c-read'),
+                conversation('c-unread', unreadCount: 3),
+              ]),
+            ),
+          ],
+          child: shell(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(dot), findsOneWidget);
+    });
+
+    testWidgets('has no dot while the DM list is loading', (tester) async {
+      final pending = Completer<List<DmConversation>>();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [dmListProvider.overrideWith(() => _PendingDms(pending))],
+          child: shell(),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byKey(dot), findsNothing);
+    });
+
+    testWidgets('has no dot when no DM is unread', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dmListProvider.overrideWith(
+              () => _Dms([conversation('c-one'), conversation('c-two')]),
+            ),
+          ],
+          child: shell(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(dot), findsNothing);
+    });
+
+    testWidgets('has no dot when every unread DM was deleted', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dmListProvider.overrideWith(
+              () => _Dms([conversation('c-unread', unreadCount: 2)]),
+            ),
+            dmConversationActionsProvider.overrideWith(
+              () => _DeletedDms({'c-unread'}),
+            ),
+          ],
+          child: shell(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(dot), findsNothing);
+    });
+  });
+}
+
+class _EmptyDms extends DmListNotifier {
+  @override
+  Future<List<DmConversation>> build() async => const [];
+}
+
+class _Dms extends DmListNotifier {
+  _Dms(this.conversations);
+
+  final List<DmConversation> conversations;
+
+  @override
+  Future<List<DmConversation>> build() async => conversations;
+}
+
+class _PendingDms extends DmListNotifier {
+  _PendingDms(this.result);
+
+  final Completer<List<DmConversation>> result;
+
+  @override
+  Future<List<DmConversation>> build() => result.future;
+}
+
+class _DeletedDms extends DmConversationActionsNotifier {
+  _DeletedDms(this.ids);
+
+  final Set<String> ids;
+
+  @override
+  DmConversationActions build() => DmConversationActions(deletedIds: ids);
 }

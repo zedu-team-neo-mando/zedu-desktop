@@ -103,8 +103,7 @@ class _AppSidebarRailState extends ConsumerState<AppSidebarRail> {
           const Spacer(),
           _RailBottomIcon(
             icon: Icons.notifications_none_outlined,
-            // No unread-count source yet; show the dot once there is one.
-            hasNotification: false,
+            hasNotification: ref.watch(unreadDmsProvider).isNotEmpty,
             tooltip: 'Notifications',
             onTap: () {
               showDialog<void>(
@@ -285,6 +284,7 @@ class _RailBottomIcon extends StatelessWidget {
                 right: 6,
                 top: 6,
                 child: Container(
+                  key: const Key('sidebarNotificationDot'),
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(

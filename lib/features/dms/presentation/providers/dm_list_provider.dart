@@ -105,6 +105,24 @@ final dmConversationActionsProvider =
       DmConversationActionsNotifier.new,
     );
 
+/// The conversations that currently have unread messages, excluding deleted
+/// ones. Empty while the list is loading or failed, so callers can show an
+/// unread indicator only once there is something unread to show.
+final unreadDmsProvider = Provider<List<DmConversation>>((ref) {
+  final deletedIds = ref.watch(
+    dmConversationActionsProvider.select((actions) => actions.deletedIds),
+  );
+  final conversations = ref.watch(dmListProvider).value;
+  if (conversations == null) return const [];
+  return conversations
+      .where(
+        (conversation) =>
+            conversation.unreadCount > 0 &&
+            !deletedIds.contains(conversation.channelId),
+      )
+      .toList(growable: false);
+});
+
 class DmListNotifier extends AsyncNotifier<List<DmConversation>> {
   int _currentPage = 1;
   bool _hasMore = true;
