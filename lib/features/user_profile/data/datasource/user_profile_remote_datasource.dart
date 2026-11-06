@@ -285,25 +285,7 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
         return loadedTeamMembers;
       }
 
-      final list = _members.map(TeamMemberModel.fromJson).toList();
-      // Dynamically generate 1000+ mock members to demonstrate efficient search and scroll!
-      if (list.length < 100) {
-        final roles = ['User', 'Guess', 'Manager', 'Project Lead'];
-        for (int i = 1; i <= 1000; i++) {
-          list.add(
-            TeamMemberModel(
-              id: 'member-mock-$i',
-              email: 'teammate$i@zedu.app',
-              role: roles[i % roles.length],
-              dateJoined: 'May ${i % 20 + 1}, 2026',
-              status: TeamMemberStatus.active,
-              name: 'Teammate $i',
-              avatarUrl: null,
-            ),
-          );
-        }
-      }
-      return list;
+      return _members.map(TeamMemberModel.fromJson).toList();
     }
 
     if (orgId == null || orgId.length < 36) {
