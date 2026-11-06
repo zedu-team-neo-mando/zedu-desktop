@@ -5,7 +5,7 @@ import 'package:zedu/features/features.dart';
 
 import '../../../../../helpers/helpers.dart';
 
-class _DeferredUploads implements FilesRepository {
+class _DeferredUploads extends StubFilesRepository {
   String workspace = 'A';
   final destinations = <String>[];
   final first = Completer<Result<WorkspaceFile>>();
