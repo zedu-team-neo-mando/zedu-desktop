@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -67,11 +70,23 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
       return;
     }
 
-    await showEditProfileDialog(context, account, (updated) async {
-      await notifier.updateAccount(updated);
-      // updateAccount clears the error when it starts and sets it on failure.
-      return ref.read(userProfileNotifierProvider).error;
-    });
+    await showEditProfileDialog(
+      context,
+      account,
+      (updated) async {
+        await notifier.updateAccount(updated);
+        // updateAccount clears the error when it starts and sets it on failure.
+        return ref.read(userProfileNotifierProvider).error;
+      },
+      onUploadPhoto: (path) async {
+        await ref.read(userProfileNotifierProvider.notifier).uploadAvatar(path);
+        return ref.read(userProfileNotifierProvider).error;
+      },
+      onRemovePhoto: () async {
+        await ref.read(userProfileNotifierProvider.notifier).removeAvatar();
+        return ref.read(userProfileNotifierProvider).error;
+      },
+    );
   }
 
   Future<void> _handleMenuAction(String action) async {
@@ -115,6 +130,8 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
         await _showConversationSearch();
       case 'view_files':
         await _showConversationFiles();
+      case 'export_conversation':
+        await _exportConversation();
       case 'clear_history':
         final confirmed = await _confirmConversationAction(
           title: 'Clear history?',
@@ -130,6 +147,14 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
               .clearLocalHistory();
           _showActionNotice('History cleared on this device.');
         }
+      case 'report_user':
+        await reportContent(
+          context,
+          subject: 'Report: ${conversation.displayName}',
+          details:
+              'Reported user: ${conversation.displayName}\n'
+              'User ID: ${conversation.participantId}',
+        );
       case 'delete_conversation':
         final confirmed = await _confirmConversationAction(
           title: 'Delete conversation?',
@@ -203,6 +228,73 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
         history: history,
       ),
     );
+  }
+
+  /// Asks Text or PDF, loads the whole conversation, and saves its transcript
+  /// (timestamp and author on every message, oldest first) where the user
+  /// picks.
+  Future<void> _exportConversation() async {
+    final format = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Export conversation'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'txt'),
+            child: const Text('Text file (.txt)'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'pdf'),
+            child: const Text('PDF document (.pdf)'),
+          ),
+        ],
+      ),
+    );
+    if (format == null || !mounted) return;
+
+    final conversation = widget.conversation;
+    final history = ref.read(chatHistoryProvider(conversation.channelId));
+    try {
+      await history.loadAll();
+      if (!mounted) return;
+      final entries = buildTranscript(
+        messages: history.messages,
+        isMine: history.isMyMessage,
+        myName: history.currentUserName,
+        otherName: conversation.displayName,
+      );
+      final title = 'Conversation with ${conversation.displayName}';
+      final now = DateTime.now();
+      final Uint8List bytes;
+      if (format == 'pdf') {
+        final font = await rootBundle.load(
+          'assets/fonts/Roboto/Roboto-Regular.ttf',
+        );
+        bytes = await transcriptToPdf(
+          title: title,
+          entries: entries,
+          exportedAt: now,
+          font: font,
+        );
+      } else {
+        bytes = Uint8List.fromList(
+          utf8.encode(
+            transcriptToText(title: title, entries: entries, exportedAt: now),
+          ),
+        );
+      }
+      final path = await FilePicker.saveFile(
+        dialogTitle: 'Export conversation',
+        fileName: transcriptFileName(conversation.displayName, now, format),
+        type: FileType.custom,
+        allowedExtensions: [format],
+      );
+      if (path == null) return;
+      await File(path).writeAsBytes(bytes);
+      if (mounted) _showActionNotice('Conversation exported.');
+    } catch (_) {
+      if (mounted) _showActionNotice('Could not export the conversation.');
+    }
   }
 
   void _showActionNotice(String message) {
@@ -681,19 +773,20 @@ class _DmChatHeader extends StatelessWidget {
           CircleAvatar(
             radius: 20,
             backgroundColor: colors.primary,
-            backgroundImage: conversation.effectiveAvatarUrl != null
+            foregroundImage: conversation.effectiveAvatarUrl != null
                 ? NetworkImage(conversation.effectiveAvatarUrl!)
                 : null,
-            child: conversation.effectiveAvatarUrl == null
-                ? Text(
-                    participantInitial,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  )
+            onForegroundImageError: conversation.effectiveAvatarUrl != null
+                ? ignoreAvatarError
                 : null,
+            child: Text(
+              participantInitial,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
+            ),
           ),
           const SizedBox(width: 12),
           if (isOwnSpace)
@@ -789,9 +882,12 @@ class _DmChatHeader extends StatelessWidget {
               menuItem('pinned_messages', 'Pinned messages'),
               menuItem('search_in_conversation', 'Search in conversation'),
               menuItem('view_files', 'View files'),
+              menuItem('export_conversation', 'Export conversation'),
               const PopupMenuDivider(height: 1),
               menuItem('clear_history', 'Clear history'),
-              menuItem('block_user', 'Block User'),
+              menuItem('report_user', 'Report ${conversation.displayName}'),
+              if (kUnfinishedFeaturesEnabled)
+                menuItem('block_user', 'Block User'),
               menuItem(
                 'delete_conversation',
                 'Delete conversation',
@@ -958,20 +1054,22 @@ class _MessageBubble extends ConsumerWidget {
             CircleAvatar(
               radius: 15,
               backgroundColor: colors.primary,
-              backgroundImage:
+              foregroundImage:
                   senderAvatarUrl != null && senderAvatarUrl.isNotEmpty
                   ? NetworkImage(senderAvatarUrl)
                   : null,
-              child: senderAvatarUrl == null || senderAvatarUrl.isEmpty
-                  ? Text(
-                      senderInitial,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
-                    )
+              onForegroundImageError:
+                  senderAvatarUrl != null && senderAvatarUrl.isNotEmpty
+                  ? ignoreAvatarError
                   : null,
+              child: Text(
+                senderInitial,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
             ),
             const SizedBox(width: 12),
           ],
@@ -1007,6 +1105,13 @@ class _MessageBubble extends ConsumerWidget {
                     enabled: isMe && status == null,
                     onEdit: () => onEdit(messageId, content),
                     onDelete: () => _confirmDelete(context, ref, messageId),
+                    onReport: isMe
+                        ? null
+                        : () => reportContent(
+                            context,
+                            subject: 'Report: message from $senderName',
+                            details: 'Message from $senderName:\n"$content"',
+                          ),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -1238,12 +1343,16 @@ class _OwnMessageMenu extends StatefulWidget {
     required this.enabled,
     required this.onEdit,
     required this.onDelete,
+    this.onReport,
     required this.child,
   });
 
   final bool enabled;
   final VoidCallback? onEdit;
   final VoidCallback onDelete;
+
+  /// Shown instead of Edit and Delete on other people's messages.
+  final VoidCallback? onReport;
   final Widget child;
 
   @override
@@ -1256,7 +1365,8 @@ class _OwnMessageMenuState extends State<_OwnMessageMenu> {
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.enabled) return widget.child;
+    final canReport = !widget.enabled && widget.onReport != null;
+    if (!widget.enabled && !canReport) return widget.child;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -1273,19 +1383,29 @@ class _OwnMessageMenuState extends State<_OwnMessageMenu> {
                 key: _menuKey,
                 tooltip: 'Message actions',
                 icon: const Icon(Icons.more_horiz, size: 18),
-                onSelected: (value) =>
-                    value == 'edit' ? widget.onEdit?.call() : widget.onDelete(),
-                itemBuilder: (_) => [
-                  if (widget.onEdit != null)
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Text('Edit message'),
-                    ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Text('Delete message'),
-                  ),
-                ],
+                onSelected: (value) => switch (value) {
+                  'edit' => widget.onEdit?.call(),
+                  'report' => widget.onReport?.call(),
+                  _ => widget.onDelete(),
+                },
+                itemBuilder: (_) => canReport
+                    ? const [
+                        PopupMenuItem(
+                          value: 'report',
+                          child: Text('Report message'),
+                        ),
+                      ]
+                    : [
+                        if (widget.onEdit != null)
+                          const PopupMenuItem(
+                            value: 'edit',
+                            child: Text('Edit message'),
+                          ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Text('Delete message'),
+                        ),
+                      ],
               ),
             ),
             Flexible(child: widget.child),
