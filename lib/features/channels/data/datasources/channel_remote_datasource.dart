@@ -29,6 +29,20 @@ abstract class ChannelRemoteDataSource {
   /// The latest messages of a channel, newest first.
   Future<List<ChannelMessage>> fetchChannelMessages(String channelId);
 
+  /// Usernames of the users who reacted with [reactionId] on [threadId].
+  Future<List<String>> fetchReactionUsers({
+    required String reactionId,
+    required String threadId,
+  });
+
+  /// Adds the current user's [emoji] reaction to [threadId], or removes it
+  /// if they have already reacted. Returns whether the user reacted now.
+  Future<bool> toggleReaction({
+    required String channelId,
+    required String threadId,
+    required String emoji,
+  });
+
   /// Stars the channel for this user, or unstars it if it is already starred.
   /// Returns whether it is starred now.
   Future<bool> toggleStarChannel({
@@ -188,6 +202,46 @@ class ChannelRemoteDataSourceImpl implements ChannelRemoteDataSource {
         .toList();
   }
 
+  @override
+  Future<List<String>> fetchReactionUsers({
+    required String reactionId,
+    required String threadId,
+  }) async {
+    final response = await apiBaseService.get<Map<String, dynamic>>(
+      path: '/reactions/$reactionId/thread/$threadId',
+    );
+    final data = response.data['data'] as Map<String, dynamic>?;
+    final usernames = data?['usernames'] as List?;
+    if (usernames == null) return [];
+    return [
+      // The backend sends either plain username strings or user objects.
+      for (final entry in usernames)
+        if (entry is String && entry.trim().isNotEmpty)
+          entry.trim()
+        else if (entry is Map<String, dynamic>)
+          ..._usernameFromUserObject(entry),
+    ];
+  }
+
+  @override
+  Future<bool> toggleReaction({
+    required String channelId,
+    required String threadId,
+    required String emoji,
+  }) async {
+    final response = await apiBaseService.post<Map<String, dynamic>>(
+      path: '/reactions/$channelId',
+      data: {'reaction': emoji, 'thread_id': threadId, 'type': 'thread'},
+    );
+    final data = response.data['data'];
+    // Toggle semantics: the user is removed when data comes back null/empty.
+    if (data is Map<String, dynamic>) {
+      final reaction = data['reaction']?.toString() ?? '';
+      if (reaction == emoji) return true;
+    }
+    return false;
+  }
+
   // The channel users route nests username and avatar_url under profile.
   String _memberField(Map<String, dynamic> member, String field) {
     final profile = member['profile'];
@@ -195,6 +249,11 @@ class ChannelRemoteDataSourceImpl implements ChannelRemoteDataSource {
     if (nested is String && nested.isNotEmpty) return nested;
     final topLevel = member[field];
     return topLevel is String ? topLevel : '';
+  }
+
+  List<String> _usernameFromUserObject(Map<String, dynamic> user) {
+    final username = _memberField(user, 'username').trim();
+    return username.isEmpty ? const [] : [username];
   }
 
   Future<List<String>> _fetchAllMemberIds(String path) async {

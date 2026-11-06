@@ -24,3 +24,21 @@ final channelMembersProvider = FutureProvider.autoDispose
         Failure<List<DmParticipant>>(:final error) => throw error,
       };
     });
+
+/// The usernames of everyone who reacted with a given reaction on a message.
+final reactionUsersProvider = FutureProvider.autoDispose
+    .family<List<String>, ({String reactionId, String threadId})>((
+      ref,
+      key,
+    ) async {
+      final result = await ref
+          .watch(channelRepositoryProvider)
+          .fetchReactionUsers(
+            reactionId: key.reactionId,
+            threadId: key.threadId,
+          );
+      return switch (result) {
+        Success<List<String>>(:final value) => value,
+        Failure<List<String>>(:final error) => throw error,
+      };
+    });

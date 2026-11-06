@@ -1,3 +1,25 @@
+/// A single reaction (emoji) on a channel message, as returned by
+/// `GET /threads/channels/{channel_id}`.
+class ChannelReaction {
+  final String emoji;
+  final String reactionId;
+  final int count;
+
+  const ChannelReaction({
+    required this.emoji,
+    required this.reactionId,
+    required this.count,
+  });
+
+  factory ChannelReaction.fromJson(Map<String, dynamic> json) {
+    return ChannelReaction(
+      emoji: json['reaction']?.toString() ?? '',
+      reactionId: json['reaction_id']?.toString() ?? '',
+      count: (json['reaction_count'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 /// A top-level message in a channel, as returned by
 /// `GET /threads/channels/{channel_id}`.
 class ChannelMessage {
@@ -7,6 +29,7 @@ class ChannelMessage {
   final String text;
   final DateTime? createdAt;
   final String? status;
+  final List<ChannelReaction> reactions;
 
   const ChannelMessage({
     this.id,
@@ -15,6 +38,7 @@ class ChannelMessage {
     this.avatarUrl,
     this.createdAt,
     this.status,
+    this.reactions = const [],
   });
 
   factory ChannelMessage.fromJson(Map<String, dynamic> json) {
@@ -45,6 +69,10 @@ class ChannelMessage {
         json['created_at']?.toString() ?? '',
       )?.toLocal(),
       status: json['status']?.toString(),
+      reactions: [
+        for (final entry in (json['reactions'] as List? ?? const []))
+          if (entry is Map<String, dynamic>) ChannelReaction.fromJson(entry),
+      ],
     );
   }
 

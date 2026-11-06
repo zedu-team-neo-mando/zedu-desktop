@@ -4,6 +4,28 @@ import 'package:zedu/features/features.dart';
 
 class MockChannelRepository extends Mock implements ChannelRepository {}
 
+class _FakeAuthNotifier extends AuthNotifier {
+  @override
+  AuthState build() => AuthState(
+    status: AuthStatus.authenticated,
+    user: User(
+      id: 'user-1',
+      firstName: 'Test',
+      lastName: 'User',
+      email: 'test@example.com',
+      phone: '',
+      username: 'testuser',
+      isVerified: true,
+      isOnboarded: true,
+      createdAt: DateTime(2026),
+      currentOrg: 'org-1',
+      currentOrganisationSlug: 'test-org',
+      avatarUrl: '',
+      defaultAvatarUrl: '',
+    ),
+  );
+}
+
 class FakeChatHistoryNotifier extends ChangeNotifier
     implements ChatHistoryNotifier {
   FakeChatHistoryNotifier(this.channelId);
@@ -53,6 +75,7 @@ void main() {
           ProviderScope(
             overrides: [
               channelRepositoryProvider.overrideWithValue(repository),
+              authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
               chatHistoryProvider.overrideWith(
                 (ref, channelId) => chatNotifier ?? fakeChatHistory,
               ),
@@ -177,4 +200,135 @@ void main() {
       expect(fakeChatHistory.retriedMessageId, 'failed-msg-1');
     },
   );
+
+  const reactedMessage = ChannelMessage(
+    id: 'm-1',
+    senderName: 'Ada',
+    text: 'reacted message',
+    reactions: [
+      ChannelReaction(emoji: '👍', reactionId: 'r-1', count: 3),
+      ChannelReaction(emoji: '🔥', reactionId: 'r-2', count: 1),
+    ],
+  );
+
+  void stubReactionUsers() {
+    when(
+      () => repository.fetchReactionUsers(
+        reactionId: any(named: 'reactionId'),
+        threadId: any(named: 'threadId'),
+      ),
+    ).thenAnswer((_) async => const Success(<String>[]));
+  }
+
+  testWidgets('renders a pill with the count for each reaction (#2684)', (
+    tester,
+  ) async {
+    stubReactionUsers();
+
+    await pumpList(tester, const Success([reactedMessage]));
+
+    expect(find.text('👍'), findsOneWidget);
+    expect(find.text('3'), findsOneWidget);
+    expect(find.text('🔥'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
+  });
+
+  testWidgets(
+    'tapping a pill toggles the reaction and refreshes the history (#2684)',
+    (tester) async {
+      stubReactionUsers();
+      when(
+        () => repository.toggleReaction(
+          channelId: 'ch-1',
+          threadId: 'm-1',
+          emoji: '👍',
+        ),
+      ).thenAnswer((_) async => const Success(true));
+
+      await pumpList(tester, const Success([reactedMessage]));
+
+      await tester.tap(find.text('👍'));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => repository.toggleReaction(
+          channelId: 'ch-1',
+          threadId: 'm-1',
+          emoji: '👍',
+        ),
+      ).called(1);
+    },
+  );
+
+  testWidgets('highlights only the pills the user has reacted with (#2684)', (
+    tester,
+  ) async {
+    when(
+      () => repository.fetchReactionUsers(reactionId: 'r-1', threadId: 'm-1'),
+    ).thenAnswer((_) async => const Success(['Ada', 'testuser']));
+    when(
+      () => repository.fetchReactionUsers(reactionId: 'r-2', threadId: 'm-1'),
+    ).thenAnswer((_) async => const Success([]));
+
+    await pumpList(tester, const Success([reactedMessage]));
+
+    final colors = tester.element(find.text('👍')).colors;
+    final thumbsPill = tester.widget<Material>(
+      find.ancestor(of: find.text('👍'), matching: find.byType(Material)).first,
+    );
+    final firePill = tester.widget<Material>(
+      find.ancestor(of: find.text('🔥'), matching: find.byType(Material)).first,
+    );
+
+    expect(thumbsPill.color, colors.primary);
+    expect(firePill.color, colors.background);
+  });
+
+  testWidgets('the add-reaction button opens the picker and reacts (#2684)', (
+    tester,
+  ) async {
+    stubReactionUsers();
+    when(
+      () => repository.toggleReaction(
+        channelId: 'ch-1',
+        threadId: 'm-1',
+        emoji: '😀',
+      ),
+    ).thenAnswer((_) async => const Success(true));
+
+    await pumpList(tester, const Success([reactedMessage]));
+
+    await tester.tap(find.byIcon(Icons.add_reaction_outlined));
+    await tester.pumpAndSettle();
+    expect(find.text('Emoji'), findsOneWidget);
+
+    await tester.tap(find.text('😀'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Emoji'), findsNothing);
+    verify(
+      () => repository.toggleReaction(
+        channelId: 'ch-1',
+        threadId: 'm-1',
+        emoji: '😀',
+      ),
+    ).called(1);
+  });
+
+  testWidgets('pending messages show no reactions row (#2684)', (tester) async {
+    fakeChatHistory.messages = [
+      {
+        'id': 'temp-1',
+        'content': 'Optimistic message',
+        'channel_id': 'ch-1',
+        'status': 'sending',
+        'created_at': DateTime.now().toIso8601String(),
+      },
+    ];
+
+    await pumpList(tester, const Success(<ChannelMessage>[]));
+
+    expect(find.text('Optimistic message'), findsOneWidget);
+    expect(find.byIcon(Icons.add_reaction_outlined), findsNothing);
+  });
 }

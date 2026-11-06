@@ -76,6 +76,7 @@ class ChannelMessageList extends ConsumerWidget {
       itemBuilder: (context, index) {
         final message = messages[index];
         return ChannelMessageTile(
+          channelId: channelId,
           message: message,
           onRetry: message.id != null
               ? () => ref
@@ -88,19 +89,91 @@ class ChannelMessageList extends ConsumerWidget {
   }
 }
 
-class ChannelMessageTile extends StatelessWidget {
-  const ChannelMessageTile({super.key, required this.message, this.onRetry});
+class ChannelMessageTile extends ConsumerStatefulWidget {
+  const ChannelMessageTile({
+    super.key,
+    required this.channelId,
+    required this.message,
+    this.onRetry,
+  });
 
+  final String channelId;
   final ChannelMessage message;
   final VoidCallback? onRetry;
 
   @override
+  ConsumerState<ChannelMessageTile> createState() => _ChannelMessageTileState();
+}
+
+class _ChannelMessageTileState extends ConsumerState<ChannelMessageTile> {
+  /// Emojis with a toggle request still in flight, to block double taps.
+  final Set<String> _busyEmojis = {};
+
+  ChannelMessage get _message => widget.message;
+
+  Future<void> _toggleReaction(String emoji, {String? reactionId}) async {
+    final messageId = _message.id;
+    if (messageId == null || messageId.isEmpty) return;
+    if (_busyEmojis.contains(emoji)) return;
+
+    setState(() => _busyEmojis.add(emoji));
+    final scaffoldMessenger = ScaffoldMessenger.maybeOf(context);
+    try {
+      final result = await ref
+          .read(channelRepositoryProvider)
+          .toggleReaction(
+            channelId: widget.channelId,
+            threadId: messageId,
+            emoji: emoji,
+          );
+      switch (result) {
+        case Success<bool>():
+          ref.invalidate(channelHistoryProvider(widget.channelId));
+          if (reactionId != null && reactionId.isNotEmpty) {
+            ref.invalidate(
+              reactionUsersProvider((
+                reactionId: reactionId,
+                threadId: messageId,
+              )),
+            );
+          }
+        case Failure<bool>(:final error):
+          scaffoldMessenger?.showSnackBar(
+            SnackBar(content: Text(error.message)),
+          );
+      }
+    } finally {
+      if (mounted) setState(() => _busyEmojis.remove(emoji));
+    }
+  }
+
+  void _openEmojiPicker() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: DmEmojiPicker(
+          onEmojiSelected: (emoji) {
+            Navigator.of(dialogContext).pop();
+            _toggleReaction(emoji);
+          },
+          onClose: () => Navigator.of(dialogContext).pop(),
+        ),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final avatarUrl = message.avatarUrl;
-    final time = message.createdAt;
-    final initial = avatarInitial(message.senderName);
-    final status = message.status;
+    final avatarUrl = _message.avatarUrl;
+    final time = _message.createdAt;
+    final initial = avatarInitial(_message.senderName);
+    final status = _message.status;
+    final hasReactions = _message.reactions.isNotEmpty;
+    final canReact =
+        _message.id != null && _message.id!.isNotEmpty && status == null;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -122,7 +195,7 @@ class ChannelMessageTile extends StatelessWidget {
               children: [
                 Text.rich(
                   TextSpan(
-                    text: message.senderName,
+                    text: _message.senderName,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: colors.textPrimary,
@@ -145,17 +218,51 @@ class ChannelMessageTile extends StatelessWidget {
                 MessageLinkScope(
                   builder: (context, links) => SelectableText.rich(
                     links.span(
-                      message.text,
+                      _message.text,
                       TextStyle(fontSize: 15, color: colors.textPrimary),
                     ),
                   ),
                 ),
+                if (hasReactions || canReact)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        for (final reaction in _message.reactions)
+                          _ReactionPill(
+                            reaction: reaction,
+                            reacted: _didUserReact(reaction),
+                            busy: _busyEmojis.contains(reaction.emoji),
+                            onTap: () => _toggleReaction(
+                              reaction.emoji,
+                              reactionId: reaction.reactionId,
+                            ),
+                          ),
+                        if (canReact)
+                          IconButton(
+                            onPressed: _openEmojiPicker,
+                            icon: Icon(
+                              Icons.add_reaction_outlined,
+                              size: 18,
+                              color: colors.textHint,
+                            ),
+                            tooltip: 'Add reaction',
+                            visualDensity: VisualDensity.compact,
+                            padding: const EdgeInsets.all(4),
+                            constraints: const BoxConstraints(),
+                          ),
+                      ],
+                    ),
+                  ),
                 if (status != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: status == 'failed'
                         ? GestureDetector(
-                            onTap: onRetry,
+                            onTap: widget.onRetry,
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -188,6 +295,75 @@ class ChannelMessageTile extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  bool _didUserReact(ChannelReaction reaction) {
+    final messageId = _message.id ?? '';
+    final authState = ref.watch(authNotifierProvider);
+    final user = authState.user;
+    final String? myUsername = user == null
+        ? null
+        : (user.username.isEmpty ? user.email.split('@').first : user.username)
+              .toLowerCase();
+    if (myUsername == null) return false;
+    final users = ref
+        .watch(
+          reactionUsersProvider((
+            reactionId: reaction.reactionId,
+            threadId: messageId,
+          )),
+        )
+        .value;
+    return users?.any((u) => u.toLowerCase() == myUsername) ?? false;
+  }
+}
+
+class _ReactionPill extends StatelessWidget {
+  const _ReactionPill({
+    required this.reaction,
+    required this.reacted,
+    required this.busy,
+    required this.onTap,
+  });
+
+  final ChannelReaction reaction;
+  final bool reacted;
+  final bool busy;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final background = reacted ? colors.primary : colors.background;
+    final border = reacted ? colors.primary : colors.divider;
+    final foreground = reacted ? colors.onPrimary : colors.textSecondary;
+
+    return Material(
+      color: background,
+      shape: StadiumBorder(side: BorderSide(color: border)),
+      child: InkWell(
+        onTap: busy ? null : onTap,
+        customBorder: const StadiumBorder(),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(reaction.emoji, style: const TextStyle(fontSize: 14)),
+              const SizedBox(width: 4),
+              Text(
+                '${reaction.count}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: foreground,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

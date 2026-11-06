@@ -155,4 +155,44 @@ class ChannelRepositoryImpl implements ChannelRepository {
       return Failure(ApiFailure(message: e.toString()));
     }
   }
+
+  @override
+  Future<Result<List<String>>> fetchReactionUsers({
+    required String reactionId,
+    required String threadId,
+  }) async {
+    try {
+      return Success(
+        await remoteDataSource.fetchReactionUsers(
+          reactionId: reactionId,
+          threadId: threadId,
+        ),
+      );
+    } on ApiFailure catch (e) {
+      return Failure(e);
+    } catch (e) {
+      return Failure(ApiFailure(message: e.toString()));
+    }
+  }
+
+  @override
+  Future<Result<bool>> toggleReaction({
+    required String channelId,
+    required String threadId,
+    required String emoji,
+  }) async {
+    try {
+      return Success(
+        await remoteDataSource.toggleReaction(
+          channelId: channelId,
+          threadId: threadId,
+          emoji: emoji,
+        ),
+      );
+    } on ApiFailure catch (e) {
+      return Failure(e);
+    } catch (e) {
+      return Failure(ApiFailure(message: e.toString()));
+    }
+  }
 }
