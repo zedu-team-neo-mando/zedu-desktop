@@ -6,6 +6,9 @@ import 'package:zedu/features/features.dart';
 import '../../../../../helpers/helpers.dart';
 
 class _DeferredUploads implements FilesRepository {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
   String workspace = 'A';
   final destinations = <String>[];
   final first = Completer<Result<WorkspaceFile>>();
@@ -77,11 +80,9 @@ void main() {
       completeFirst();
       final outcome = await upload;
 
-      expect(
-        repository.destinations,
-        ['A'],
-        reason: 'Do not send remaining files to workspace B.',
-      );
+      expect(repository.destinations, [
+        'A',
+      ], reason: 'Do not send remaining files to workspace B.');
       expect(outcome.uploaded, 1);
       expect(outcome.skippedNames, ['second.txt']);
       expect(outcome.failedNames, isEmpty);

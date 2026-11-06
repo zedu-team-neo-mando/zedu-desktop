@@ -223,6 +223,9 @@ void main() {
 /// Server pages of ten files, newest first: page 1 holds the newest files and
 /// every later page holds older ones.
 class _PagedRepository implements FilesRepository {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
   int totalPages = 1;
   final pages = <int>[];
 
@@ -269,6 +272,9 @@ class _PagedRepository implements FilesRepository {
 }
 
 class _UploadRepository implements FilesRepository {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
   final uploaded = <String>[];
   ApiFailure? folderError;
 
