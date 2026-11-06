@@ -41,7 +41,15 @@ class _HomeViewState extends ConsumerState<HomeView> {
             child: Row(
               children: [
                 AppSidebarRail(activeType: ref.watch(homeSidebarProvider)),
-                ResizableSidebar(child: const _MainSidebarSwitcher()),
+                // The planner fills the workspace on its own: it has no
+                // channel list beside it. Keeping it mounted preserves the
+                // width the user dragged the sidebar to.
+                Visibility(
+                  visible:
+                      ref.watch(homeSidebarProvider) != HomeSidebarType.planner,
+                  maintainState: true,
+                  child: ResizableSidebar(child: const _MainSidebarSwitcher()),
+                ),
                 Expanded(
                   child: Stack(
                     children: [
@@ -191,6 +199,9 @@ class _ChatAreaSwitcher extends ConsumerWidget {
     }
     if (state == HomeSidebarType.files) {
       return const FilesView();
+    }
+    if (state == HomeSidebarType.planner) {
+      return const PlannerView();
     }
     return const HomeChatArea();
   }

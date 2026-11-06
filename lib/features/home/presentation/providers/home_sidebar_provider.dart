@@ -1,6 +1,6 @@
 import 'package:zedu/core/core.dart';
 
-enum HomeSidebarType { home, dms, people, files, buzz }
+enum HomeSidebarType { home, dms, people, files, planner, buzz }
 
 class HomeSidebarNotifier extends Notifier<HomeSidebarType> {
   @override
