@@ -15,6 +15,10 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
   bool _isLoading = false;
   String? _errorMessage;
 
+  /// True once the user has picked or removed someone. Until then the member
+  /// hint is plain guidance, not an error.
+  bool _touched = false;
+
   // Filtered members list
   List<TeamMember> _filteredMembers = [];
   bool _showDropdown = false;
@@ -75,6 +79,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
 
   void _toggleMemberSelection(TeamMember member) {
     setState(() {
+      _touched = true;
       if (_selectedMembers.any((m) => m.id == member.id)) {
         _selectedMembers.removeWhere((m) => m.id == member.id);
       } else {
@@ -577,7 +582,9 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
       text = 'Ready to create conversation! (Selected: $count members)';
     } else {
       icon = Icons.info_outline;
-      color = _errorMessage != null ? colors.error : colors.textSecondary;
+      color = (_touched || _errorMessage != null)
+          ? colors.error
+          : colors.textSecondary;
       text =
           'Select at least 2 members to start a group DM (Selected: $count/2)';
     }

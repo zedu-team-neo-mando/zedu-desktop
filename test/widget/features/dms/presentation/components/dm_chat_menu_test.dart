@@ -42,6 +42,7 @@ void main() {
     when(() => history.hasMore).thenReturn(false);
     when(() => history.loadFailed).thenReturn(false);
     when(() => history.loadMoreFailed).thenReturn(false);
+    when(() => history.historyCleared).thenReturn(false);
     final drafts = MockDraftStore();
     when(() => drafts.load(any())).thenAnswer((_) async => null);
 
@@ -72,6 +73,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('View profile'), findsOneWidget);
+    expect(find.text('Export conversation'), findsOneWidget);
     expect(find.text('Delete conversation'), findsOneWidget);
     final menuSurface = tester
         .widgetList<Material>(find.byType(Material))

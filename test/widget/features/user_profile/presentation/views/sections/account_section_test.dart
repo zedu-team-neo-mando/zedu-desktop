@@ -1,3 +1,4 @@
+import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
 import '../../../../../../helpers/helpers.dart';
@@ -9,14 +10,16 @@ Future<void> _pump(WidgetTester tester, ProfileAccount account) async {
   addTearDown(tester.view.resetDevicePixelRatio);
 
   await tester.pumpWidget(
-    buildTestMaterialApp(
-      Scaffold(
-        body: SingleChildScrollView(
-          child: AccountSection(
-            account: account,
-            isSaving: false,
-            onSave: (_) {},
-            onDelete: () async {},
+    ProviderScope(
+      child: buildTestMaterialApp(
+        Scaffold(
+          body: SingleChildScrollView(
+            child: AccountSection(
+              account: account,
+              isSaving: false,
+              onSave: (_) {},
+              onDelete: () async {},
+            ),
           ),
         ),
       ),
@@ -30,6 +33,51 @@ void main() {
     email: 'ada@zedu.test',
     timezone: 'Africa/Lagos',
   );
+
+  testWidgets('shows the initials when there is no avatar', (tester) async {
+    await _pump(tester, account);
+
+    expect(find.text('AL'), findsOneWidget);
+    expect(find.byIcon(Icons.person), findsNothing);
+    expect(find.byType(Image), findsNothing);
+  });
+
+  testWidgets('shows the avatar when there is one', (tester) async {
+    await _pump(
+      tester,
+      account.copyWith(avatarUrl: 'https://cdn.zedu.test/ada.png'),
+    );
+
+    final image = tester.widget<Image>(find.byType(Image));
+    expect((image.image as NetworkImage).url, 'https://cdn.zedu.test/ada.png');
+    expect(find.text('AL'), findsNothing);
+  });
+
+  testWidgets('shows the initials when the avatar fails to load', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      account.copyWith(avatarUrl: 'https://cdn.zedu.test/broken.png'),
+    );
+
+    final image = tester.widget<Image>(find.byType(Image));
+    final fallback = image.errorBuilder!(
+      tester.element(find.byType(Image)),
+      Exception('404'),
+      null,
+    );
+    await tester.pumpWidget(buildTestMaterialApp(Scaffold(body: fallback)));
+
+    expect(find.text('AL'), findsOneWidget);
+  });
+
+  testWidgets('treats a blank avatar link as no avatar', (tester) async {
+    await _pump(tester, account.copyWith(avatarUrl: '   '));
+
+    expect(find.text('AL'), findsOneWidget);
+    expect(find.byType(Image), findsNothing);
+  });
 
   testWidgets('shows the saved username as the handle', (tester) async {
     await _pump(tester, account.copyWith(username: 'CountessAda'));
@@ -56,5 +104,20 @@ void main() {
     await _pump(tester, account.copyWith(username: '   '));
 
     expect(find.text('@adalovelace'), findsOneWidget);
+  });
+
+  testWidgets('the Reduce motion switch turns it on', (tester) async {
+    await _pump(tester, account);
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(AccountSection)),
+    );
+    expect(container.read(reduceMotionProvider), isFalse);
+
+    await tester.ensureVisible(find.text('Reduce motion'));
+    await tester.tap(find.byType(Switch));
+    await tester.pump();
+
+    expect(container.read(reduceMotionProvider), isTrue);
+    expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
   });
 }
