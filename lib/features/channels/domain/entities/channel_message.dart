@@ -7,6 +7,13 @@ class ChannelMessage {
   final String text;
   final DateTime? createdAt;
   final String? status;
+  final List<dynamic> media;
+
+  /// The message's thread id, which the edit and delete routes take.
+  final String? threadId;
+
+  /// Who sent it, so the current user's own messages can be edited.
+  final String? userId;
 
   const ChannelMessage({
     this.id,
@@ -15,7 +22,17 @@ class ChannelMessage {
     this.avatarUrl,
     this.createdAt,
     this.status,
+    this.media = const [],
+    this.threadId,
+    this.userId,
   });
+
+  static List<dynamic> mediaFrom(dynamic raw) {
+    if (raw is List) {
+      return raw.whereType<Map<dynamic, dynamic>>().toList();
+    }
+    return const [];
+  }
 
   factory ChannelMessage.fromJson(Map<String, dynamic> json) {
     String? nonEmpty(Object? value) {
@@ -33,19 +50,42 @@ class ChannelMessage {
       avatarUrl:
           nonEmpty(json['avatar_url']) ?? nonEmpty(json['default_avatar_url']),
       // Messages sent from the web app arrive as HTML (`<p>hi</p>`).
-      text: _decodeHtmlEntities(
-        (json['message']?.toString() ?? '')
-            .replaceAll(
-              RegExp(r'</(p|div|li)>\s*<(p|div|li|ul|ol)\b[^>]*>|<br\s*/?>'),
-              '\n',
-            )
-            .replaceAll(RegExp(r'<[^>]*>'), ''),
-      ).trim(),
+      text: _cleanMessageText(json['message']?.toString() ?? ''),
       createdAt: DateTime.tryParse(
         json['created_at']?.toString() ?? '',
       )?.toLocal(),
       status: json['status']?.toString(),
+      media: mediaFrom(json['media'] ?? json['files'] ?? json['attachments']),
+      threadId: nonEmpty(json['thread_id']) ?? nonEmpty(json['id']),
+      userId: nonEmpty(json['user_id']),
     );
+  }
+
+  static final _htmlBlock = RegExp(
+    r'^\s*<(p|div|blockquote|pre|h[1-6]|ul|ol|table)\b',
+    caseSensitive: false,
+  );
+
+  static final _htmlTag = RegExp(
+    r'<(/?)(p|div|blockquote|pre|h[1-6]|ul|ol|li|strong|b|em|i|s|del|strike|code|a|span|br|hr|table|tbody|thead|tr|td|th)\b[^>]*>',
+    caseSensitive: false,
+  );
+
+  static String _cleanMessageText(String raw) {
+    if (!_htmlBlock.hasMatch(raw)) {
+      return _decodeHtmlEntities(raw).trim();
+    }
+    return _decodeHtmlEntities(
+      raw
+          .replaceAll(
+            RegExp(
+              r'</(p|div|li)>\s*<(p|div|li|ul|ol)\b[^>]*>|<br\s*/?>',
+              caseSensitive: false,
+            ),
+            '\n',
+          )
+          .replaceAll(_htmlTag, ''),
+    ).trim();
   }
 
   /// Decodes in a single pass, so `&amp;lt;` stays the literal text `&lt;`.

@@ -7,53 +7,52 @@ class MockChatHistory extends Mock implements ChatHistoryNotifier {}
 
 class MockDraftStore extends Mock implements DmDraftStore {}
 
+class MockApiBaseService extends Mock implements ApiBaseService {}
+
 class _FakeAuthNotifier extends AuthNotifier {
   @override
   AuthState build() => const AuthState();
 }
 
+/// Answers searches from a fixed list, or fails when [fail] is set.
+class _FakeDmRepository extends DmRepository {
+  _FakeDmRepository() : super(MockApiBaseService());
+
+  final searches = <({String channelId, String query})>[];
+  List<ConversationSearchHit> hits = const [];
+  bool fail = false;
+
+  @override
+  Future<List<ConversationSearchHit>> searchMessages({
+    required String channelId,
+    required String query,
+  }) async {
+    searches.add((channelId: channelId, query: query));
+    if (fail) throw const ApiFailure(message: 'boom');
+    return hits;
+  }
+}
+
 final _today = DateTime.now();
 
-final _messages = <Map<String, dynamic>>[
-  {
-    'id': 'm1',
-    'content': '<p>The budget review is on Friday</p>',
-    'created_at': DateTime(
-      _today.year,
-      _today.month,
-      _today.day,
-      16,
-      5,
-    ).toUtc().toIso8601String(),
-    'mine': false,
-  },
-  {
-    'id': 'm2',
-    'content': 'Sounds good, see you then',
-    'created_at': DateTime(2025, 11, 3, 9, 30).toUtc().toIso8601String(),
-    'mine': true,
-  },
-];
-
-Future<void> _openSearch(WidgetTester tester) async {
+Future<_FakeDmRepository> _openSearch(WidgetTester tester) async {
   tester.view.physicalSize = const Size(1280, 900);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
 
   final history = MockChatHistory();
-  when(() => history.messages).thenReturn(_messages);
+  when(() => history.messages).thenReturn(const []);
   when(() => history.isLoading).thenReturn(false);
   when(() => history.hasMore).thenReturn(false);
   when(() => history.loadFailed).thenReturn(false);
   when(() => history.loadMoreFailed).thenReturn(false);
   when(() => history.historyCleared).thenReturn(false);
   when(() => history.currentUserName).thenReturn('Me');
-  when(() => history.isMyMessage(any())).thenAnswer(
-    (call) => (call.positionalArguments.first as Map)['mine'] == true,
-  );
+  when(() => history.isMyMessage(any())).thenReturn(false);
   final drafts = MockDraftStore();
   when(() => drafts.load(any())).thenAnswer((_) async => null);
+  final repository = _FakeDmRepository();
 
   await tester.pumpWidget(
     ProviderScope(
@@ -61,6 +60,7 @@ Future<void> _openSearch(WidgetTester tester) async {
         authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
         chatHistoryProvider('chat-1').overrideWith((ref) => history),
         dmDraftStoreProvider.overrideWith((ref) => drafts),
+        dmRepositoryProvider.overrideWithValue(repository),
       ],
       child: buildTestMaterialApp(
         Scaffold(
@@ -82,12 +82,19 @@ Future<void> _openSearch(WidgetTester tester) async {
   await tester.pumpAndSettle();
   await tester.tap(find.text('Search in conversation'));
   await tester.pumpAndSettle();
+  return repository;
 }
 
 Finder get _searchField => find.descendant(
-  of: find.byType(AlertDialog),
+  of: find.byType(SearchPanel),
   matching: find.byType(TextField),
 );
+
+Future<void> _search(WidgetTester tester, String query) async {
+  await tester.enterText(_searchField, query);
+  await tester.pump(const Duration(milliseconds: 300));
+  await tester.pumpAndSettle();
+}
 
 Future<void> _unmount(WidgetTester tester) async {
   await tester.pumpWidget(const SizedBox.shrink());
@@ -113,60 +120,73 @@ void main() {
   });
 
   group('Search in conversation', () {
+    testWidgets('opens the search panel beside the messages', (tester) async {
+      await _openSearch(tester);
+
+      expect(find.byType(SearchPanel), findsOneWidget);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('Enter a search term'), findsOneWidget);
+      await _unmount(tester);
+    });
+
+    testWidgets('searches this conversation on the server', (tester) async {
+      final repository = await _openSearch(tester);
+      repository.hits = [
+        ConversationSearchHit(
+          messageId: 'm1',
+          text: 'The budget review is on Friday',
+          userName: 'Ada Obi',
+          sentAt: DateTime(_today.year, _today.month, _today.day, 16, 5),
+        ),
+      ];
+
+      await _search(tester, 'budget');
+
+      expect(repository.searches, [(channelId: 'chat-1', query: 'budget')]);
+      expect(
+        find.text('The budget review is on Friday', findRichText: true),
+        findsOneWidget,
+      );
+      expect(find.text('Ada Obi · 4:05 PM'), findsOneWidget);
+      await _unmount(tester);
+    });
+
     testWidgets('says nothing matched instead of showing a blank list', (
       tester,
     ) async {
       await _openSearch(tester);
 
-      await tester.enterText(_searchField, 'zzzz');
-      await tester.pump();
+      await _search(tester, 'zzzz');
 
       expect(find.text('No messages match "zzzz"'), findsOneWidget);
       await _unmount(tester);
     });
 
-    testWidgets('shows the sender and time with each result', (tester) async {
-      await _openSearch(tester);
-
-      await tester.enterText(_searchField, 'budget');
-      await tester.pump();
-
-      expect(find.text('The budget review is on Friday'), findsOneWidget);
-      expect(find.text('Ada Obi · 4:05 PM'), findsOneWidget);
-      await _unmount(tester);
-    });
-
-    testWidgets('labels my messages with my name and an earlier date', (
+    testWidgets('shows an error with a retry when the search fails', (
       tester,
     ) async {
-      await _openSearch(tester);
+      final repository = await _openSearch(tester);
+      repository.fail = true;
 
-      await tester.enterText(_searchField, 'see you');
-      await tester.pump();
+      await _search(tester, 'budget');
+      expect(find.text("Couldn't search messages."), findsOneWidget);
 
-      expect(find.text('Sounds good, see you then'), findsOneWidget);
-      expect(find.text('Me · Nov 3, 9:30 AM'), findsOneWidget);
+      repository.fail = false;
+      await tester.tap(find.text('Try again'));
+      await tester.pumpAndSettle();
+
+      expect(repository.searches, hasLength(2));
+      expect(find.text('No messages match "budget"'), findsOneWidget);
       await _unmount(tester);
     });
 
-    testWidgets('matches the visible text, not the HTML tags', (tester) async {
+    testWidgets('closes the panel', (tester) async {
       await _openSearch(tester);
 
-      await tester.enterText(_searchField, '<p>');
-      await tester.pump();
+      await tester.tap(find.byTooltip('Close search'));
+      await tester.pumpAndSettle();
 
-      expect(find.text('No messages match "<p>"'), findsOneWidget);
-      await _unmount(tester);
-    });
-
-    testWidgets('says the search covers only loaded messages', (tester) async {
-      await _openSearch(tester);
-
-      expect(
-        find.text('Searches the messages loaded in this conversation.'),
-        findsOneWidget,
-      );
-      expect(find.text('Enter a search term'), findsOneWidget);
+      expect(find.byType(SearchPanel), findsNothing);
       await _unmount(tester);
     });
   });

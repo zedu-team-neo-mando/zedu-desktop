@@ -12,6 +12,7 @@ class ChannelDirectoryView extends ConsumerStatefulWidget {
 class _ChannelDirectoryViewState extends ConsumerState<ChannelDirectoryView> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  bool _showArchived = false;
 
   @override
   void dispose() {
@@ -49,7 +50,7 @@ class _ChannelDirectoryViewState extends ConsumerState<ChannelDirectoryView> {
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: TextField(
             controller: _searchController,
-            onChanged: (val) => setState(() => _searchQuery = val),
+            onChanged: (val) => setState(() => _searchQuery = val.trim()),
             decoration: InputDecoration(
               hintText: 'Search channels',
               prefixIcon: Icon(Icons.search, color: colors.textHint),
@@ -75,9 +76,29 @@ class _ChannelDirectoryViewState extends ConsumerState<ChannelDirectoryView> {
             style: textTheme.bodyMedium?.copyWith(color: colors.textPrimary),
           ),
         ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+          child: Wrap(
+            spacing: 8,
+            children: [
+              ChoiceChip(
+                label: const Text('Channels'),
+                selected: !_showArchived,
+                onSelected: (_) => setState(() => _showArchived = false),
+              ),
+              ChoiceChip(
+                label: const Text('Archived'),
+                selected: _showArchived,
+                onSelected: (_) => setState(() => _showArchived = true),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 16),
         Expanded(
-          child: channelState.isLoading
+          child: _showArchived
+              ? ArchivedChannelList(searchQuery: _searchQuery)
+              : channelState.isLoading
               ? const Center(child: CircularProgressIndicator())
               : channelState.hasError && !channelState.hasValue
               ? Center(
@@ -156,13 +177,77 @@ class _ChannelDirectoryViewState extends ConsumerState<ChannelDirectoryView> {
                               ),
                             )
                           : null,
-                      trailing: Text(
-                        channel.membersCount.countLabel('member'),
-                        style: textTheme.bodySmall?.copyWith(
-                          color: colors.textSecondary,
-                        ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (channel.unreadCount > 0) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.error,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '${channel.unreadCount}',
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.onError,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          Text(
+                            channel.membersCount.countLabel('member'),
+                            style: textTheme.bodySmall?.copyWith(
+                              color: colors.textSecondary,
+                            ),
+                          ),
+                          if (!channel.hasAccess &&
+                              !channel.archived &&
+                              !channel.isPrivate) ...[
+                            const SizedBox(width: 12),
+                            OutlinedButton(
+                              onPressed: () async {
+                                final result = await ref
+                                    .read(channelProvider.notifier)
+                                    .joinChannel(channel.id);
+                                if (result is Success<void> &&
+                                    context.mounted) {
+                                  ref
+                                      .read(activeChatProvider.notifier)
+                                      .selectChannel(
+                                        channel.name,
+                                        channelId: channel.id,
+                                      );
+                                }
+                              },
+                              child: const Text('Join'),
+                            ),
+                          ],
+                        ],
                       ),
-                      onTap: () {
+                      onTap: () async {
+                        if (!channel.hasAccess &&
+                            !channel.archived &&
+                            !channel.isPrivate) {
+                          final result = await ref
+                              .read(channelProvider.notifier)
+                              .joinChannel(channel.id);
+                          if (result is Success<void> && context.mounted) {
+                            ref
+                                .read(activeChatProvider.notifier)
+                                .selectChannel(
+                                  channel.name,
+                                  channelId: channel.id,
+                                );
+                          }
+                          return;
+                        }
                         ref
                             .read(activeChatProvider.notifier)
                             .selectChannel(channel.name, channelId: channel.id);

@@ -1,8 +1,6 @@
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
-import 'composer/composer.dart';
-
 class DmChatArea extends ConsumerStatefulWidget {
   final DmConversation conversation;
 
@@ -14,10 +12,22 @@ class DmChatArea extends ConsumerStatefulWidget {
 
 class _DmChatAreaState extends ConsumerState<DmChatArea> {
   bool _isDragging = false;
+  bool _searchOpen = false;
   final _composerKey = GlobalKey<DmMessageComposerState>();
 
   /// The message whose thread is open beside the chat, if any.
   Map<String, dynamic>? _threadMessage;
+
+  /// This widget is reused when another conversation is selected. A thread
+  /// belongs to one conversation, so it must not stay open over the next one,
+  /// where a reply would be posted to the wrong channel.
+  @override
+  void didUpdateWidget(DmChatArea oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.conversation.channelId != widget.conversation.channelId) {
+      _threadMessage = null;
+    }
+  }
 
   /// The server knows a DM message's thread by its thread_id; messages that
   /// only carry an id use that.
@@ -65,9 +75,7 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
 
   bool get _isOwnSpace {
     final userId = ref.read(authNotifierProvider).user?.id;
-    return userId != null &&
-        userId.isNotEmpty &&
-        widget.conversation.participantId == userId;
+    return widget.conversation.isOwnSpaceFor(userId);
   }
 
   bool _isOwnSpaceSystemEvent(Map<String, dynamic> message) {
@@ -132,10 +140,14 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
         ref
             .read(dmConversationActionsProvider.notifier)
             .togglePinned(conversation.channelId);
+      case 'pinned_messages':
+        await _showPinnedMessages();
       case 'search_in_conversation':
         await _showConversationSearch();
       case 'view_files':
         await _showConversationFiles();
+      case 'export_transcript':
+        await _showExportTranscript();
       case 'clear_history':
         final confirmed = await _confirmConversationAction(
           title: 'Clear history?',
@@ -200,29 +212,56 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
         false;
   }
 
-  Future<void> _showConversationSearch() async {
+  Future<void> _showPinnedMessages() async {
     final history = ref.read(
       chatHistoryProvider(widget.conversation.channelId),
     );
-    final messages = [
-      for (final message in history.messages)
-        _SearchableMessage(
-          text: _SearchableMessage.plainText(message['content']),
-          sender: history.isMyMessage(message)
-              ? history.currentUserName
-              : widget.conversation.displayName,
-          sentAt: DateTime.tryParse(
-            message['created_at']?.toString() ?? '',
-          )?.toLocal(),
-        ),
-    ].where((message) => message.text.isNotEmpty).toList();
+    final pinned = history.messages
+        .where(
+          (message) =>
+              message['is_pinned'] == true || message['pinned'] == true,
+        )
+        .toList();
     await showDialog<void>(
       context: context,
-      builder: (context) => _ConversationSearchDialog(
-        displayName: widget.conversation.displayName,
-        messages: messages,
+      builder: (context) => AlertDialog(
+        title: Text('${widget.conversation.displayName} pinned messages'),
+        content: SizedBox(
+          width: 420,
+          child: pinned.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: Text('Pinned messages are not available yet'),
+                  ),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: pinned.length,
+                  itemBuilder: (context, index) {
+                    final msg = pinned[index];
+                    return ListTile(
+                      title: Text(msg['content']?.toString() ?? ''),
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
       ),
     );
+  }
+
+  Future<void> _showConversationSearch() async {
+    // One side panel at a time, so the chat keeps a usable width.
+    setState(() {
+      _searchOpen = true;
+      _threadMessage = null;
+    });
   }
 
   Future<void> _showConversationFiles() async {
@@ -233,6 +272,19 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
       context: context,
       builder: (context) => ConversationFilesDialog(
         title: '${widget.conversation.displayName} files',
+        history: history,
+      ),
+    );
+  }
+
+  Future<void> _showExportTranscript() async {
+    final history = ref.read(
+      chatHistoryProvider(widget.conversation.channelId),
+    );
+    await showDialog<void>(
+      context: context,
+      builder: (context) => ExportTranscriptDialog(
+        conversationName: widget.conversation.displayName,
         history: history,
       ),
     );
@@ -347,9 +399,10 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                                               ?.enterEditMode(id, text),
                                           onReply: _threadIdOf(msg).isEmpty
                                               ? null
-                                              : () => setState(
-                                                  () => _threadMessage = msg,
-                                                ),
+                                              : () => setState(() {
+                                                  _threadMessage = msg;
+                                                  _searchOpen = false;
+                                                }),
                                         );
                                       }, childCount: messages.length),
                                     ),
@@ -420,6 +473,12 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
                 ),
                 if (_threadMessage case final message?)
                   _buildThreadPanel(message),
+                if (_searchOpen)
+                  SearchPanel(
+                    key: ValueKey(widget.conversation.channelId),
+                    channelId: widget.conversation.channelId,
+                    onClose: () => setState(() => _searchOpen = false),
+                  ),
               ],
             ),
 
@@ -603,154 +662,6 @@ class _HistoryLoadError extends StatelessWidget {
           TextButton(onPressed: onRetry, child: const Text('Retry')),
         ],
       ),
-    );
-  }
-}
-
-/// A loaded message as the conversation search shows it.
-class _SearchableMessage {
-  final String text;
-  final String sender;
-  final DateTime? sentAt;
-
-  const _SearchableMessage({
-    required this.text,
-    required this.sender,
-    this.sentAt,
-  });
-
-  /// Message content is HTML. Search and show what the person actually wrote,
-  /// so tag names never match and no tags appear in the results.
-  static String plainText(Object? content) => (content?.toString() ?? '')
-      .replaceAll(RegExp(r'</?(p|div|li|ul|ol|br|blockquote|pre)\b[^>]*>'), ' ')
-      .replaceAll(RegExp(r'<[^>]*>'), '')
-      .replaceAll('&nbsp;', ' ')
-      .replaceAll('&lt;', '<')
-      .replaceAll('&gt;', '>')
-      .replaceAll('&quot;', '"')
-      .replaceAll('&#39;', "'")
-      .replaceAll('&amp;', '&')
-      .replaceAll(RegExp(r'\s+'), ' ')
-      .trim();
-
-  /// "4:05 PM" for today, "Nov 3, 4:05 PM" for earlier days.
-  String? get sentAtLabel {
-    final at = sentAt;
-    if (at == null) return null;
-    final hour = at.hour > 12 ? at.hour - 12 : (at.hour == 0 ? 12 : at.hour);
-    final minute = at.minute.toString().padLeft(2, '0');
-    final period = at.hour >= 12 ? 'PM' : 'AM';
-    final time = '$hour:$minute $period';
-    final now = DateTime.now();
-    if (at.year == now.year && at.month == now.month && at.day == now.day) {
-      return time;
-    }
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', //
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    return '${months[at.month - 1]} ${at.day}, $time';
-  }
-}
-
-class _ConversationSearchDialog extends StatefulWidget {
-  final String displayName;
-  final List<_SearchableMessage> messages;
-
-  const _ConversationSearchDialog({
-    required this.displayName,
-    required this.messages,
-  });
-
-  @override
-  State<_ConversationSearchDialog> createState() =>
-      _ConversationSearchDialogState();
-}
-
-class _ConversationSearchDialogState extends State<_ConversationSearchDialog> {
-  final _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final textTheme = context.textTheme;
-    final rawQuery = _controller.text.trim();
-    final query = rawQuery.toLowerCase();
-    final results = query.isEmpty
-        ? const <_SearchableMessage>[]
-        : widget.messages
-              .where((message) => message.text.toLowerCase().contains(query))
-              .toList();
-    final hintStyle = textTheme.bodyMedium?.copyWith(
-      color: colors.textSecondary,
-    );
-
-    return AlertDialog(
-      title: Text('Search ${widget.displayName}'),
-      content: SizedBox(
-        width: 420,
-        height: 360,
-        child: Column(
-          mainAxisSize: MainAxisSize.max,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _controller,
-              autofocus: true,
-              decoration: const InputDecoration(hintText: 'Search messages'),
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Searches the messages loaded in this conversation.',
-              style: textTheme.bodySmall?.copyWith(color: colors.textHint),
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: query.isEmpty
-                  ? Text('Enter a search term', style: hintStyle)
-                  : results.isEmpty
-                  ? Text('No messages match "$rawQuery"', style: hintStyle)
-                  : ListView.builder(
-                      itemCount: results.length,
-                      itemBuilder: (context, index) {
-                        final message = results[index];
-                        final sentAt = message.sentAtLabel;
-                        return ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            message.text,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Text(
-                            sentAt == null
-                                ? message.sender
-                                : '${message.sender} · $sentAt',
-                            style: textTheme.bodySmall?.copyWith(
-                              color: colors.textSecondary,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Close'),
-        ),
-      ],
     );
   }
 }
@@ -1008,6 +919,7 @@ class _DmChatHeader extends StatelessWidget {
               menuItem('pinned_messages', 'Pinned messages'),
               menuItem('search_in_conversation', 'Search in conversation'),
               menuItem('view_files', 'View files'),
+              menuItem('export_transcript', 'Export transcript'),
               const PopupMenuDivider(height: 1),
               menuItem('clear_history', 'Clear history'),
               menuItem('block_user', 'Block User'),
@@ -1045,7 +957,12 @@ class _MessageBubble extends ConsumerWidget {
     String text,
     TextStyle defaultStyle,
     MessageLinks links,
-  ) => buildInlineMarkdownSpan(text, defaultStyle, plainText: links.span);
+  ) => buildInlineMarkdownSpan(
+    text,
+    defaultStyle,
+    plainText: links.span,
+    link: links.link,
+  );
 
   /// Splits [text] around Markdown thematic breaks: a line that is exactly
   /// `---` at the start of the message or after a blank line. A `---` right
@@ -1102,6 +1019,24 @@ class _MessageBubble extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _pin(
+    BuildContext context,
+    WidgetRef ref,
+    String messageId,
+  ) async {
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final pinned = await ref
+        .read(chatHistoryProvider(channelId))
+        .pinMessage(messageId);
+    AppToastService.showWith(
+      overlay,
+      type: pinned ? AppToastType.success : AppToastType.error,
+      message: pinned
+          ? 'Message pinned'
+          : "Couldn't pin the message. Try again.",
     );
   }
 
@@ -1242,10 +1177,13 @@ class _MessageBubble extends ConsumerWidget {
                   ),
                 ),
                 if (content.isNotEmpty)
-                  _OwnMessageMenu(
-                    enabled: isMe && status == null,
-                    onEdit: () => onEdit(messageId, content),
-                    onDelete: () => _confirmDelete(context, ref, messageId),
+                  _MessageMenu(
+                    enabled: status == null,
+                    onPin: () => _pin(context, ref, messageId),
+                    onEdit: isMe ? () => onEdit(messageId, content) : null,
+                    onDelete: isMe
+                        ? () => _confirmDelete(context, ref, messageId)
+                        : null,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -1272,12 +1210,14 @@ class _MessageBubble extends ConsumerWidget {
                     child: content.isNotEmpty
                         ? _AttachmentBubbleList(media: media, isMe: isMe)
                         // No text to hang the menu on, so it goes on the
-                        // attachments (Delete only: there is nothing to edit).
-                        : _OwnMessageMenu(
-                            enabled: isMe && status == null,
+                        // attachments (no Edit: there is nothing to edit).
+                        : _MessageMenu(
+                            enabled: status == null,
+                            onPin: () => _pin(context, ref, messageId),
                             onEdit: null,
-                            onDelete: () =>
-                                _confirmDelete(context, ref, messageId),
+                            onDelete: isMe
+                                ? () => _confirmDelete(context, ref, messageId)
+                                : null,
                             child: _AttachmentBubbleList(
                               media: media,
                               isMe: isMe,
@@ -1331,11 +1271,17 @@ class _MessageBubble extends ConsumerWidget {
   }
 }
 
-class _AttachmentBubbleList extends StatelessWidget {
+typedef _AttachmentBubbleList = MessageAttachmentList;
+
+class MessageAttachmentList extends StatelessWidget {
   final List<dynamic> media;
   final bool isMe;
 
-  const _AttachmentBubbleList({required this.media, required this.isMe});
+  const MessageAttachmentList({
+    super.key,
+    required this.media,
+    this.isMe = false,
+  });
 
   void _launchUrl(String url) async {
     final uri = Uri.tryParse(url);
@@ -1411,15 +1357,34 @@ class _AttachmentBubbleList extends StatelessWidget {
       runSpacing: 8,
       alignment: isMe ? WrapAlignment.end : WrapAlignment.start,
       children: media.map((item) {
-        final String fileName = (item['file_name'] ?? 'Attachment').toString();
-        final String fileLink = (item['file_link'] ?? '').toString();
+        if (item is! Map) return const SizedBox.shrink();
+        final map = item is Map<String, dynamic>
+            ? item
+            : Map<String, dynamic>.from(item);
+        final String fileName =
+            (map['file_name'] ?? map['name'] ?? map['title'] ?? 'Attachment')
+                .toString();
+        final String fileLink =
+            (map['file_link'] ??
+                    map['url'] ??
+                    map['file_url'] ??
+                    map['link'] ??
+                    '')
+                .toString();
+        String fileType = (map['file_type'] ?? map['type'] ?? '')
+            .toString()
+            .toLowerCase();
+        if (fileType.isEmpty && fileName.contains('.')) {
+          fileType = fileName.split('.').last.toLowerCase();
+        }
         final isImage = [
           'png',
           'jpg',
           'jpeg',
           'gif',
           'webp',
-        ].contains((item['file_type'] ?? '').toString().toLowerCase());
+          'bmp',
+        ].contains(fileType);
 
         if (isImage && fileLink.isNotEmpty) {
           final isNetwork = fileLink.startsWith('http');
@@ -1470,26 +1435,30 @@ class _AttachmentBubbleList extends StatelessWidget {
 }
 
 /// Shows a "more" button on hover, and a right-click or long-press menu, for
-/// your own messages, with Edit and Delete. The long press is for touch input,
-/// where there is no hover or right click.
-class _OwnMessageMenu extends StatefulWidget {
-  const _OwnMessageMenu({
+/// a sent message: Pin on every message, and Edit and Delete on your own. The
+/// long press is for touch input, where there is no hover or right click.
+class _MessageMenu extends StatefulWidget {
+  const _MessageMenu({
     required this.enabled,
+    required this.onPin,
     required this.onEdit,
     required this.onDelete,
     required this.child,
   });
 
   final bool enabled;
+  final VoidCallback onPin;
+
+  /// Null on other people's messages, which can't be edited or deleted.
   final VoidCallback? onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback? onDelete;
   final Widget child;
 
   @override
-  State<_OwnMessageMenu> createState() => _OwnMessageMenuState();
+  State<_MessageMenu> createState() => _MessageMenuState();
 }
 
-class _OwnMessageMenuState extends State<_OwnMessageMenu> {
+class _MessageMenuState extends State<_MessageMenu> {
   final _menuKey = GlobalKey<PopupMenuButtonState<String>>();
   bool _hovered = false;
 
@@ -1512,18 +1481,23 @@ class _OwnMessageMenuState extends State<_OwnMessageMenu> {
                 key: _menuKey,
                 tooltip: 'Message actions',
                 icon: const Icon(Icons.more_horiz, size: 18),
-                onSelected: (value) =>
-                    value == 'edit' ? widget.onEdit?.call() : widget.onDelete(),
+                onSelected: (value) => switch (value) {
+                  'pin' => widget.onPin(),
+                  'edit' => widget.onEdit?.call(),
+                  _ => widget.onDelete?.call(),
+                },
                 itemBuilder: (_) => [
+                  const PopupMenuItem(value: 'pin', child: Text('Pin message')),
                   if (widget.onEdit != null)
                     const PopupMenuItem(
                       value: 'edit',
                       child: Text('Edit message'),
                     ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Text('Delete message'),
-                  ),
+                  if (widget.onDelete != null)
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Text('Delete message'),
+                    ),
                 ],
               ),
             ),

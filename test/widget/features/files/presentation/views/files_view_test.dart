@@ -13,6 +13,29 @@ class _FakeWorkspaceNotifier extends WorkspaceNotifier {
   );
 }
 
+/// Signed in as Ada (u-1), who uploaded logo.png.
+class _FakeAuthNotifier extends AuthNotifier {
+  @override
+  AuthState build() => AuthState(
+    status: AuthStatus.authenticated,
+    user: User(
+      id: 'u-1',
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      email: 'ada@zedu.test',
+      phone: '',
+      username: 'ada',
+      isVerified: true,
+      isOnboarded: true,
+      createdAt: DateTime(2026, 1, 1),
+      currentOrg: 'org-1',
+      currentOrganisationSlug: 'org-1',
+      avatarUrl: '',
+      defaultAvatarUrl: '',
+    ),
+  );
+}
+
 class _FakeProfileNotifier extends UserProfileNotifier {
   @override
   UserProfileState build() => const UserProfileState(
@@ -30,6 +53,30 @@ class _FakeProfileNotifier extends UserProfileNotifier {
 
   @override
   Future<void> load() async {}
+}
+
+/// Signed in as Ada (`u-1`), who owns the listed files. The share dialog reads
+/// the signed-in user to leave them out of its suggestions.
+class _FakeAuthNotifier extends AuthNotifier {
+  @override
+  AuthState build() => AuthState(
+    status: AuthStatus.authenticated,
+    user: User(
+      id: 'u-1',
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      email: 'ada@zedu.test',
+      phone: '',
+      username: 'ada',
+      isVerified: true,
+      isOnboarded: true,
+      createdAt: DateTime(2026, 1, 1),
+      currentOrg: 'org-1',
+      currentOrganisationSlug: 'org-1',
+      avatarUrl: '',
+      defaultAvatarUrl: '',
+    ),
+  );
 }
 
 class _FakePeopleRepository implements PeopleRepository {
@@ -61,10 +108,15 @@ class _FakePeopleRepository implements PeopleRepository {
 }
 
 class _FakeFilesRepository implements FilesRepository {
-  _FakeFilesRepository({this.failFolders = false, this.failCreate = false});
+  _FakeFilesRepository({
+    this.failFolders = false,
+    this.failCreate = false,
+    this.createFailure,
+  });
 
   final bool failFolders;
   final bool failCreate;
+  final ApiFailure? createFailure;
   final queries = <FilesQuery>[];
   final folderRequests = <(FilesScope, String?)>[];
   final createdFolders = <(String, String, String?)>[];
@@ -73,6 +125,12 @@ class _FakeFilesRepository implements FilesRepository {
   final renames = <(String, String)>[];
   final moves = <(String, String)>[];
   Result<void> moveResult = const Success(null);
+
+  /// The folders inside each folder, by that folder's id.
+  final subfolders = <String, List<FileFolder>>{};
+
+  /// Folders whose subfolders fail to load.
+  final failingFolderLevels = <String>{};
 
   @override
   Future<Result<void>> moveFile(String fileId, String folderId) async {
@@ -231,7 +289,12 @@ class _FakeFilesRepository implements FilesRepository {
     if (failFolders) {
       return const Failure(ApiFailure(message: 'offline'));
     }
-    if (parentId != null) return const Success(FoldersPage(folders: []));
+    if (parentId != null) {
+      if (failingFolderLevels.contains(parentId)) {
+        return const Failure(ApiFailure(message: 'offline'));
+      }
+      return Success(FoldersPage(folders: subfolders[parentId] ?? const []));
+    }
     return Success(
       FoldersPage(
         folders: [
@@ -250,8 +313,10 @@ class _FakeFilesRepository implements FilesRepository {
   }
 
   @override
-  Future<Result<WorkspaceFile>> uploadFile(XFile file) async =>
-      Success(WorkspaceFile(id: 'up', name: file.name));
+  Future<Result<WorkspaceFile>> uploadFile(
+    XFile file, {
+    String? parentId,
+  }) async => Success(WorkspaceFile(id: 'up', name: file.name));
 
   @override
   Future<Result<void>> createFolder({
@@ -260,8 +325,14 @@ class _FakeFilesRepository implements FilesRepository {
     String? parentId,
   }) async {
     if (failCreate) {
-      return const Failure(ApiFailure(message: 'Folder name already exists'));
+      return const Failure(
+        ApiFailure(
+          message: 'Folder name already exists',
+          kind: ApiFailureKind.client,
+        ),
+      );
     }
+    if (createFailure case final error?) return Failure(error);
     createdFolders.add((name, orgId, parentId));
     return const Success(null);
   }
@@ -281,6 +352,7 @@ Future<void> _pump(
     ProviderScope(
       overrides: [
         workspaceProvider.overrideWith(_FakeWorkspaceNotifier.new),
+        authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
         userProfileNotifierProvider.overrideWith(_FakeProfileNotifier.new),
         filesRepositoryProvider.overrideWithValue(repository),
         peopleRepositoryProvider.overrideWithValue(_FakePeopleRepository()),
@@ -431,7 +503,7 @@ void main() {
     expect(find.text('Reports'), findsOneWidget);
   });
 
-  testWidgets('New Folder inside a folder sends it as the parent', (
+  testWidgets('inside a folder there is no Folders tab or New Folder', (
     tester,
   ) async {
     final repository = _FakeFilesRepository();
@@ -439,13 +511,18 @@ void main() {
 
     await tester.tap(find.text('docs'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('New Folder'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).last, 'drafts');
-    await tester.tap(find.text('Create'));
+
+    expect(find.text('spec.pdf'), findsOneWidget);
+    expect(find.text('Folders'), findsNothing);
+    expect(find.text('New Folder'), findsNothing);
+    expect(find.text('Upload File'), findsOneWidget);
+
+    // Back at the top level, both come back.
+    await tester.tap(find.widgetWithText(TextButton, 'All files'));
     await tester.pumpAndSettle();
 
-    expect(repository.createdFolders, [('drafts', 'org-1', 'docs')]);
+    expect(find.text('Folders'), findsWidgets);
+    expect(find.text('New Folder'), findsOneWidget);
   });
 
   testWidgets('New Folder shows the server error and stays open', (
@@ -462,6 +539,43 @@ void main() {
     expect(find.text('Folder name already exists'), findsOneWidget);
     expect(find.text('Create New Folder'), findsOneWidget);
   });
+
+  for (final (kind, expected) in [
+    (
+      ApiFailureKind.network,
+      'No internet connection. Check your network and try again.',
+    ),
+    (
+      ApiFailureKind.server,
+      'Something went wrong on our end. Please try again later.',
+    ),
+  ]) {
+    testWidgets('New Folder $kind shows safe copy and keeps the entered name', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        _FakeFilesRepository(
+          createFailure: ApiFailure(
+            message: '<html>internal-host failure</html>',
+            kind: kind,
+          ),
+        ),
+      );
+      await tester.tap(find.text('New Folder'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, 'Reports');
+      await tester.tap(find.text('Create'));
+      await tester.pumpAndSettle();
+      expect(find.text(expected), findsOneWidget);
+      expect(find.textContaining('internal-host'), findsNothing);
+      expect(find.text('Create New Folder'), findsOneWidget);
+      expect(
+        tester.widget<TextField>(find.byType(TextField).last).controller!.text,
+        'Reports',
+      );
+    });
+  }
 
   Future<void> openFilesTab(WidgetTester tester) async {
     await tester.tap(find.text('Files').last);
@@ -791,11 +905,17 @@ void main() {
     );
   });
 
-  testWidgets('the folder a file is in is not offered', (tester) async {
-    final repository = _FakeFilesRepository();
+  Finder inMoveDialog(Finder finder) =>
+      find.descendant(of: find.byType(MoveFileDialog), matching: finder);
+
+  testWidgets('the folder a file is in is not offered, but can be opened', (
+    tester,
+  ) async {
+    final repository = _FakeFilesRepository()
+      ..subfolders['docs'] = const [FileFolder(id: 'drafts', name: 'drafts')];
     await _pump(tester, repository);
 
-    // spec.pdf is inside docs, the only folder.
+    // spec.pdf is inside docs, the only top-level folder.
     await tester.tap(find.text('docs'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('More actions for spec.pdf'));
@@ -803,10 +923,108 @@ void main() {
     await tester.tap(find.text('Move'));
     await tester.pumpAndSettle();
 
+    expect(inMoveDialog(find.text('The file is already here')), findsOneWidget);
+    await tester.tap(inMoveDialog(find.text('docs')));
+    await tester.pump();
+    expect(tester.widget<FilledButton>(moveButton()).onPressed, isNull);
+
+    // Its subfolders can still be chosen.
+    await tester.tap(find.byTooltip('Open docs'));
+    await tester.pumpAndSettle();
+    await tester.tap(inMoveDialog(find.text('drafts')));
+    await tester.pump();
+    await tester.tap(moveButton());
+    await tester.pumpAndSettle();
+
+    expect(repository.moves, [('f-2', 'drafts')]);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('moves a file into a subfolder', (tester) async {
+    final repository = _FakeFilesRepository()
+      ..subfolders['docs'] = const [FileFolder(id: 'logos', name: 'Logos')];
+    await _pump(tester, repository);
+    await openFilesTab(tester);
+
+    await chooseInMenu(tester, 'Move');
+    // Only the top level is listed until a folder is opened.
+    expect(inMoveDialog(find.text('Logos')), findsNothing);
+
+    await tester.tap(find.byTooltip('Open docs'));
+    await tester.pumpAndSettle();
+
+    expect(repository.folderRequests, contains((FilesScope.all, 'docs')));
+    expect(inMoveDialog(find.text('All folders')), findsOneWidget);
+    await tester.tap(inMoveDialog(find.text('Logos')));
+    await tester.pump();
+    await tester.tap(moveButton());
+    await tester.pumpAndSettle();
+
+    expect(repository.moves, [('f-1', 'logos')]);
+    expect(find.text('Moved logo.png to Logos.'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('the breadcrumb goes back up and clears the choice', (
+    tester,
+  ) async {
+    final repository = _FakeFilesRepository()
+      ..subfolders['docs'] = const [FileFolder(id: 'logos', name: 'Logos')];
+    await _pump(tester, repository);
+    await openFilesTab(tester);
+    await chooseInMenu(tester, 'Move');
+
+    await tester.tap(find.byTooltip('Open docs'));
+    await tester.pumpAndSettle();
+    await tester.tap(inMoveDialog(find.text('Logos')));
+    await tester.pump();
+    await tester.tap(inMoveDialog(find.text('All folders')));
+    await tester.pumpAndSettle();
+
+    expect(inMoveDialog(find.text('docs')), findsOneWidget);
+    expect(inMoveDialog(find.text('Logos')), findsNothing);
+    expect(inMoveDialog(find.text('All folders')), findsNothing);
+    expect(tester.widget<FilledButton>(moveButton()).onPressed, isNull);
+  });
+
+  testWidgets('a folder that fails to load can be retried', (tester) async {
+    final repository = _FakeFilesRepository()
+      ..subfolders['docs'] = const [FileFolder(id: 'logos', name: 'Logos')]
+      ..failingFolderLevels.add('docs');
+    await _pump(tester, repository);
+    await openFilesTab(tester);
+    await chooseInMenu(tester, 'Move');
+
+    await tester.tap(find.byTooltip('Open docs'));
+    await tester.pumpAndSettle();
+    expect(inMoveDialog(find.text('Could not load folders.')), findsOneWidget);
+
+    final topLevelLoads = repository.folderRequests
+        .where((r) => r.$2 == null)
+        .length;
+    repository.failingFolderLevels.clear();
+    await tester.tap(inMoveDialog(find.text('Retry')));
+    await tester.pumpAndSettle();
+
+    expect(inMoveDialog(find.text('Logos')), findsOneWidget);
+    // Retry reloads only the level that failed.
     expect(
-      find.text('No other folders yet. Create one first.'),
-      findsOneWidget,
+      repository.folderRequests.where((r) => r.$2 == null).length,
+      topLevelLoads,
     );
+  });
+
+  testWidgets('an empty folder says so', (tester) async {
+    await _pump(tester, _FakeFilesRepository());
+    await openFilesTab(tester);
+    await chooseInMenu(tester, 'Move');
+
+    await tester.tap(find.byTooltip('Open docs'));
+    await tester.pumpAndSettle();
+
+    expect(inMoveDialog(find.text('No folders inside docs.')), findsOneWidget);
   });
 
   testWidgets('deleted files cannot be moved', (tester) async {
@@ -835,6 +1053,26 @@ void main() {
     await tester.tap(find.text(name));
     await tester.pumpAndSettle();
   }
+
+  testWidgets('Share is offered only on files you uploaded', (tester) async {
+    final repository = _FakeFilesRepository()
+      ..moreFiles = [
+        const WorkspaceFile(id: 'f-2', name: 'brief.pdf', userId: 'u-2'),
+      ];
+    await _pump(tester, repository);
+    await openFilesTab(tester);
+
+    await tester.tap(find.byTooltip('More actions for brief.pdf'));
+    await tester.pumpAndSettle();
+    expect(find.text('Download'), findsOneWidget);
+    expect(find.text('Share'), findsNothing);
+    await tester.tapAt(Offset.zero);
+    await tester.pumpAndSettle();
+
+    await tester.tap(actionsMenu());
+    await tester.pumpAndSettle();
+    expect(find.text('Share'), findsOneWidget);
+  });
 
   testWidgets('shares a file with a member by direct message', (tester) async {
     final repository = _FakeFilesRepository();

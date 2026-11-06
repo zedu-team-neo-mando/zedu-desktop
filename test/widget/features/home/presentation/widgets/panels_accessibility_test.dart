@@ -37,6 +37,7 @@ void main() {
       await tester.pumpWidget(
         _wrap(
           SearchPanel(
+            channelId: 'chat-1',
             onClose: () {
               closed = true;
             },

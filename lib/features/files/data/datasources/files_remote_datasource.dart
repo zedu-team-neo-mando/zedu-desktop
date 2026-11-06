@@ -10,7 +10,7 @@ abstract class FilesRemoteDataSource {
     int page = 1,
   });
 
-  Future<WorkspaceFile> uploadFile(XFile file);
+  Future<WorkspaceFile> uploadFile(XFile file, {String? parentId});
 
   Future<void> createFolder({
     required String name,
@@ -65,6 +65,8 @@ abstract class FilesRemoteDataSource {
   Future<void> pinFile(String fileId);
 
   Future<void> unpinFile(String fileId);
+
+  Future<void> deleteFolder(String id);
 }
 
 /// Reads `current_page` and `total_pages_count` (or `total_pages`).
@@ -156,7 +158,7 @@ class FilesRemoteDataSourceImpl implements FilesRemoteDataSource {
   /// Sends one file as the `files` part, as the web app does. The server
   /// files it at the top level of the user's files.
   @override
-  Future<WorkspaceFile> uploadFile(XFile file) async {
+  Future<WorkspaceFile> uploadFile(XFile file, {String? parentId}) async {
     final mime = file.mimeType;
     final type = mime != null && mime.contains('/')
         ? DioMediaType.parse(mime)
@@ -178,6 +180,10 @@ class FilesRemoteDataSourceImpl implements FilesRemoteDataSource {
                 ),
         ),
       );
+
+    if (parentId != null && parentId.isNotEmpty) {
+      formData.fields.add(MapEntry('folder_id', parentId));
+    }
 
     final response = await apiBaseService.post<Map<String, dynamic>>(
       path: '/files/upload-files',
@@ -363,5 +369,14 @@ class FilesRemoteDataSourceImpl implements FilesRemoteDataSource {
   @override
   Future<void> unpinFile(String fileId) async {
     await apiBaseService.delete<dynamic>(path: '/files/file/$fileId/pin');
+  }
+
+  /// Deletes the folder, as the web app does. The server removes the
+  /// folder and its contents.
+  @override
+  Future<void> deleteFolder(String id) async {
+    await apiBaseService.delete<Map<String, dynamic>>(
+      path: '/files/folders/$id',
+    );
   }
 }

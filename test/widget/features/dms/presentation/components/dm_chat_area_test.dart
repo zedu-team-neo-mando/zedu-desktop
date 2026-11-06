@@ -233,7 +233,7 @@ void main() {
   );
 
   group('DmChatArea message text', () {
-    Future<void> pumpChat(
+    Future<MockDmRepository> pumpChat(
       WidgetTester tester,
       List<Map<String, dynamic>> messages,
     ) async {
@@ -280,6 +280,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      return repository;
     }
 
     testWidgets('own space explains privacy and hides its system event', (
@@ -443,54 +444,6 @@ void main() {
       'created_at': '2026-10-17T08:00:00Z',
     };
 
-    Future<void> searchFor(WidgetTester tester, String query) async {
-      await tester.tap(find.byTooltip('More options'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Search in conversation'));
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.descendant(
-          of: find.byType(AlertDialog),
-          matching: find.byType(TextField),
-        ),
-        query,
-      );
-      await tester.pumpAndSettle();
-    }
-
-    Finder searchResult(String text) =>
-        find.descendant(of: find.byType(ListTile), matching: find.text(text));
-
-    testWidgets('search shows results without HTML tags', (tester) async {
-      await pumpChat(tester, [
-        message('m1', '<p>hello <strong>team</strong></p>'),
-      ]);
-
-      await searchFor(tester, 'team');
-
-      expect(searchResult('hello team'), findsOneWidget);
-    });
-
-    testWidgets('search does not match tag names', (tester) async {
-      await pumpChat(tester, [
-        message('m1', '<p>hello <strong>team</strong></p>'),
-      ]);
-
-      await searchFor(tester, 'strong');
-
-      expect(find.byType(ListTile), findsNothing);
-    });
-
-    testWidgets('search finds and shows decoded special characters', (
-      tester,
-    ) async {
-      await pumpChat(tester, [message('m1', '<p>Tom &amp; Jerry &lt;3</p>')]);
-
-      await searchFor(tester, 'tom & jerry');
-
-      expect(searchResult('Tom & Jerry <3'), findsOneWidget);
-    });
-
     testWidgets('Reply in thread opens that message thread beside the chat', (
       tester,
     ) async {
@@ -511,14 +464,156 @@ void main() {
       expect(find.byType(ThreadPanel), findsNothing);
     });
 
+    testWidgets('opening search closes the open thread, and back again', (
+      tester,
+    ) async {
+      await pumpChat(tester, [
+        {...message('m1', '<p>Can you review this?</p>'), 'thread_id': 't-1'},
+      ]);
+
+      await tester.tap(find.byTooltip('Reply in thread'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('More options'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Search in conversation'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SearchPanel), findsOneWidget);
+      expect(find.byType(ThreadPanel), findsNothing);
+
+      await tester.tap(find.byTooltip('Reply in thread'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ThreadPanel), findsOneWidget);
+      expect(find.byType(SearchPanel), findsNothing);
+    });
+
+    testWidgets('switching conversation closes the open thread', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1200, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final repository = MockDmRepository();
+      when(
+        () => repository.getMessages(any(), page: any(named: 'page')),
+      ).thenAnswer(
+        (_) async => [
+          {...message('m1', '<p>Can you review this?</p>'), 'thread_id': 't-1'},
+        ],
+      );
+      when(
+        () => repository.getThreadReplies(
+          channelId: any(named: 'channelId'),
+          threadId: any(named: 'threadId'),
+        ),
+      ).thenAnswer((_) async => const []);
+      final storage = MockSecureStorageService();
+      when(() => storage.readData(any())).thenAnswer((_) async => null);
+      final channel = ValueNotifier('ch-1');
+      addTearDown(channel.dispose);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dmRepositoryProvider.overrideWithValue(repository),
+            authNotifierProvider.overrideWith(FakeSignedInAuthNotifier.new),
+            dmDraftStoreProvider.overrideWith(
+              (ref) => DmDraftStore(storage, userId: 'user-1', orgId: 'org-1'),
+            ),
+          ],
+          child: buildTestMaterialApp(
+            Scaffold(
+              body: ValueListenableBuilder<String>(
+                valueListenable: channel,
+                builder: (context, channelId, _) => DmChatArea(
+                  conversation: DmConversation(
+                    channelId: channelId,
+                    username: 'Ada Lovelace',
+                    participantId: 'u-2',
+                    previewMessage: '',
+                    unreadCount: 0,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Reply in thread'));
+      await tester.pumpAndSettle();
+      expect(find.byType(ThreadPanel), findsOneWidget);
+
+      channel.value = 'ch-2';
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ThreadPanel), findsNothing);
+    });
+
     testWidgets('opens the message menu on long press', (tester) async {
       await pumpChat(tester, [ownMessage('m1', 'my message')]);
 
       await tester.longPress(find.text('my message', findRichText: true));
       await tester.pumpAndSettle();
 
+      expect(find.text('Pin message'), findsOneWidget);
       expect(find.text('Edit message'), findsOneWidget);
       expect(find.text('Delete message'), findsOneWidget);
+    });
+
+    testWidgets('offers only Pin on someone else\'s message', (tester) async {
+      await pumpChat(tester, [message('m1', 'their message')]);
+
+      await tester.longPress(find.text('their message', findRichText: true));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pin message'), findsOneWidget);
+      expect(find.text('Edit message'), findsNothing);
+      expect(find.text('Delete message'), findsNothing);
+    });
+
+    testWidgets('Pin message pins the thread and says so', (tester) async {
+      final repository = await pumpChat(tester, [
+        {...message('m1', 'their message'), 'thread_id': 'thread-1'},
+      ]);
+      when(
+        () => repository.pinMessage(threadId: 'thread-1', channelId: 'ch-1'),
+      ).thenAnswer((_) async {});
+
+      await tester.longPress(find.text('their message', findRichText: true));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pin message'));
+      await tester.pump();
+
+      verify(
+        () => repository.pinMessage(threadId: 'thread-1', channelId: 'ch-1'),
+      ).called(1);
+      expect(find.text('Message pinned'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 5));
+    });
+
+    testWidgets('Pin message says when pinning fails', (tester) async {
+      final repository = await pumpChat(tester, [
+        ownMessage('m1', 'my message'),
+      ]);
+      when(
+        () => repository.pinMessage(
+          threadId: any(named: 'threadId'),
+          channelId: any(named: 'channelId'),
+        ),
+      ).thenThrow(Exception('offline'));
+
+      await tester.longPress(find.text('my message', findRichText: true));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Pin message'));
+      await tester.pump();
+
+      expect(find.text("Couldn't pin the message. Try again."), findsOneWidget);
+      await tester.pump(const Duration(seconds: 5));
     });
 
     testWidgets('Edit message from the menu puts the message in the composer', (

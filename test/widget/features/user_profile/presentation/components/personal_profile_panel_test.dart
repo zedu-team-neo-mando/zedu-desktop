@@ -52,6 +52,7 @@ Future<ProviderContainer> _pump(
   WidgetTester tester, {
   String username = 'hassanat',
   String phoneNumber = '',
+  String avatarUrl = '',
   bool statusFails = false,
 }) async {
   tester.view.physicalSize = const Size(1400, 1000);
@@ -67,6 +68,7 @@ Future<ProviderContainer> _pump(
             timezone: 'Africa/Lagos',
             username: username,
             phoneNumber: phoneNumber,
+            avatarUrl: avatarUrl,
           ),
         ),
       ),
@@ -251,5 +253,35 @@ void main() {
     expect(find.text('Not provided'), findsOneWidget);
     expect(_copyIconBeside('Not provided'), findsNothing);
     expect(_copyIconBeside('hassanat@example.com'), findsOneWidget);
+  });
+
+  testWidgets('header close button has accessible tooltip and closes panel', (
+    t,
+  ) async {
+    final c = await _pump(t);
+    final closeBtn = find.byTooltip('Close');
+    expect(closeBtn, findsOneWidget);
+
+    final icon = find.descendant(
+      of: closeBtn,
+      matching: find.byIcon(Icons.close),
+    );
+    expect(icon, findsOneWidget);
+
+    await t.tap(closeBtn);
+    await t.pump();
+    expect(c.read(personalProfilePanelProvider), isFalse);
+  });
+
+  testWidgets('Renders image when avatarUrl is present', (t) async {
+    await _pump(t, avatarUrl: 'https://example.com/photo.png');
+    expect(find.byType(Image), findsOneWidget);
+    expect(find.byIcon(Icons.person), findsNothing);
+  });
+
+  testWidgets('Renders initials fallback when avatarUrl is empty', (t) async {
+    await _pump(t, avatarUrl: '');
+    expect(find.text('AH'), findsOneWidget);
+    expect(find.byType(Image), findsNothing);
   });
 }

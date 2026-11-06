@@ -216,6 +216,42 @@ void main() {
       expect(form.files.single.value.filename, 'notes.txt');
     });
 
+    test('sends the open folder id so the upload lands there', () async {
+      Object? sent;
+      when(
+        () => api.post<Map<String, dynamic>>(
+          path: '/files/upload-files',
+          data: any(named: 'data'),
+        ),
+      ).thenAnswer((invocation) async {
+        sent = invocation.namedArguments[#data];
+        return const ApiResponseModel<Map<String, dynamic>>(
+          statusCode: 200,
+          data: {
+            'data': [
+              {
+                'id': 'f-10',
+                'file_name': 'notes.txt',
+                'file_type': 'txt',
+                'size': 5,
+              },
+            ],
+          },
+        );
+      });
+
+      await datasource.uploadFile(
+        XFile(file.path, name: 'notes.txt'),
+        parentId: 'folder-7',
+      );
+
+      final form = sent! as FormData;
+      expect(
+        form.fields.where((entry) => entry.key == 'folder_id').single.value,
+        'folder-7',
+      );
+    });
+
     test('throws when the server returns no file', () async {
       when(
         () => api.post<Map<String, dynamic>>(

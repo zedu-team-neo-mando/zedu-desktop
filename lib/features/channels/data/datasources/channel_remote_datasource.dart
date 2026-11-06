@@ -3,6 +3,7 @@ import 'package:zedu/features/features.dart';
 
 abstract class ChannelRemoteDataSource {
   Future<List<Channel>> fetchChannels(String orgId);
+  Future<Map<String, int>> fetchChannelUnreadCounts(String orgId);
   Future<Channel> createChannel({
     required String name,
     required String description,
@@ -17,7 +18,11 @@ abstract class ChannelRemoteDataSource {
     String? description,
   });
   Future<void> archiveChannel(String channelId, bool archived);
+
+  /// The organisation's archived channels the user can see.
+  Future<List<Channel>> fetchArchivedChannels(String orgId);
   Future<void> leaveChannel(String channelId);
+  Future<void> joinChannel(String channelId);
   Future<List<String>> fetchOrganisationMemberIds(String orgId);
   Future<List<String>> fetchChannelMemberIds(String channelId);
   Future<List<DmParticipant>> fetchChannelMembers(String channelId);
@@ -28,6 +33,19 @@ abstract class ChannelRemoteDataSource {
 
   /// The latest messages of a channel, newest first.
   Future<List<ChannelMessage>> fetchChannelMessages(String channelId);
+
+  /// Replaces the text of the message with [threadId] in [channelId].
+  Future<void> editChannelMessage({
+    required String channelId,
+    required String threadId,
+    required String content,
+  });
+
+  /// Deletes the message with [threadId] in [channelId].
+  Future<void> deleteChannelMessage({
+    required String channelId,
+    required String threadId,
+  });
 
   /// Stars the channel for this user, or unstars it if it is already starred.
   /// Returns whether it is starred now.
@@ -55,9 +73,41 @@ class ChannelRemoteDataSourceImpl implements ChannelRemoteDataSource {
     );
     final data = response.data['data'] as List?;
     if (data == null) return [];
-    return data
+    final channels = data
         .map((e) => Channel.fromJson(e as Map<String, dynamic>))
         .toList();
+    // The browse-all endpoint always returns unread_count 0. The
+    // user-channels endpoint fills it, so merge those counts in. A failure
+    // there must not fail the whole list: the title just counts DMs then.
+    Map<String, int> unreadCounts = const {};
+    try {
+      unreadCounts = await fetchChannelUnreadCounts(orgId);
+    } catch (_) {
+      return channels;
+    }
+    if (unreadCounts.isEmpty) return channels;
+    return [
+      for (final channel in channels)
+        unreadCounts.containsKey(channel.id)
+            ? channel.copyWith(unreadCount: unreadCounts[channel.id]!)
+            : channel,
+    ];
+  }
+
+  @override
+  Future<Map<String, int>> fetchChannelUnreadCounts(String orgId) async {
+    final response = await apiBaseService.get<Map<String, dynamic>>(
+      path: '/organisations/$orgId/user-channels',
+    );
+    final data = response.data['data'] as List?;
+    if (data == null) return const {};
+    final counts = <String, int>{};
+    for (final entry in data) {
+      final channel = Channel.fromJson(entry as Map<String, dynamic>);
+      if (channel.id.isEmpty) continue;
+      counts[channel.id] = channel.unreadCount;
+    }
+    return counts;
   }
 
   @override
@@ -112,8 +162,10 @@ class ChannelRemoteDataSourceImpl implements ChannelRemoteDataSource {
     if (topic != null) data['topic'] = topic;
     if (description != null) data['description'] = description;
 
-    await apiBaseService.put<Map<String, dynamic>>(
-      path: '/channels/$channelId/',
+    // The backend saves topic/description edits on PATCH /channels/{id}, the
+    // route the web app uses; a PUT to '/channels/{id}/' never saved (#1432).
+    await apiBaseService.patch<Map<String, dynamic>>(
+      path: '/channels/$channelId',
       data: data,
     );
   }
@@ -127,9 +179,29 @@ class ChannelRemoteDataSourceImpl implements ChannelRemoteDataSource {
   }
 
   @override
+  Future<List<Channel>> fetchArchivedChannels(String orgId) async {
+    final response = await apiBaseService.get<Map<String, dynamic>>(
+      path: '/organisations/$orgId/channels/archived',
+    );
+    final data = response.data['data'] as List?;
+    if (data == null) return [];
+    return data
+        .map((e) => Channel.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  @override
   Future<void> leaveChannel(String channelId) async {
     await apiBaseService.post<Map<String, dynamic>>(
       path: '/channels/$channelId/leave',
+    );
+  }
+
+  @override
+  Future<void> joinChannel(String channelId) async {
+    await apiBaseService.post<Map<String, dynamic>>(
+      path: '/channels/$channelId/join',
+      data: const <String, dynamic>{},
     );
   }
 
@@ -170,6 +242,28 @@ class ChannelRemoteDataSourceImpl implements ChannelRemoteDataSource {
     await apiBaseService.post<Map<String, dynamic>>(
       path: '/channels/add-multiple',
       data: {'channel_id': channelId, 'user_ids': userIds},
+    );
+  }
+
+  @override
+  Future<void> editChannelMessage({
+    required String channelId,
+    required String threadId,
+    required String content,
+  }) async {
+    await apiBaseService.put<Map<String, dynamic>>(
+      path: '/threads/$threadId/channels/$channelId',
+      data: {'content': content},
+    );
+  }
+
+  @override
+  Future<void> deleteChannelMessage({
+    required String channelId,
+    required String threadId,
+  }) async {
+    await apiBaseService.delete<Map<String, dynamic>>(
+      path: '/threads/$threadId/channels/$channelId',
     );
   }
 

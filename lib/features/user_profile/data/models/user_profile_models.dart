@@ -1,3 +1,4 @@
+import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
 class ProfileAccountModel extends ProfileAccount {
@@ -206,7 +207,7 @@ class OrganizationProfileModel extends OrganizationProfile {
           json['nature_of_business'] as String? ??
           json['type'] as String? ??
           '',
-      country: json['country'] as String? ?? '',
+      country: countryDisplayName(json['country'] as String? ?? ''),
     );
   }
 
@@ -255,14 +256,19 @@ class TeamMemberModel extends TeamMember {
       email: json['email'] as String? ?? 'anonymoususer@gmail.com',
       role: json['role'] as String? ?? 'Administrator',
       dateJoined: json['date_joined'] as String? ?? 'May 3, 2026',
-      status: _statusFromJson(json['status'] as String?),
+      status: statusFromJson(json),
       name: json['name'] as String?,
       avatarUrl: json['avatar_url'] as String?,
     );
   }
 
-  static TeamMemberStatus _statusFromJson(String? value) {
-    return switch (value) {
+  /// Reads a member's status from an API record: `status` ("pending",
+  /// "inactive", any case), and `is_deactivated: true` counts as inactive.
+  /// Anything else is active.
+  static TeamMemberStatus statusFromJson(Map<String, dynamic> json) {
+    if (json['is_deactivated'] == true) return TeamMemberStatus.inactive;
+    final value = json['status'];
+    return switch (value is String ? value.trim().toLowerCase() : null) {
       'pending' => TeamMemberStatus.pending,
       'inactive' => TeamMemberStatus.inactive,
       _ => TeamMemberStatus.active,
@@ -278,11 +284,21 @@ class RolePermissionModel extends RolePermission {
   });
 
   factory RolePermissionModel.fromJson(Map<String, dynamic> json) {
+    // Organisation role records use `name` and a map of permission flags,
+    // e.g. {"can_create_channels": true}; keep only the granted keys.
+    final rawPermissions = json['permissions'];
+    final permissions = switch (rawPermissions) {
+      final List<dynamic> list => list.cast<String>(),
+      final Map<dynamic, dynamic> map => [
+        for (final entry in map.entries)
+          if (entry.value == true) entry.key.toString(),
+      ],
+      _ => const <String>[],
+    };
     return RolePermissionModel(
-      role: json['role'] as String? ?? 'User',
+      role: json['role'] as String? ?? json['name'] as String? ?? 'User',
       description: json['description'] as String? ?? '',
-      permissions:
-          (json['permissions'] as List<dynamic>?)?.cast<String>() ?? const [],
+      permissions: permissions,
     );
   }
 }

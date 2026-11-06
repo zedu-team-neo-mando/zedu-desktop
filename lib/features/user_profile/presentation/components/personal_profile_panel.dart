@@ -55,6 +55,7 @@ class PersonalProfilePanel extends ConsumerWidget {
                 ),
                 const Spacer(),
                 IconButton(
+                  tooltip: 'Close',
                   onPressed: () {
                     ref.read(personalProfilePanelProvider.notifier).state =
                         false;
@@ -79,16 +80,43 @@ class PersonalProfilePanel extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   // Avatar
-                  Container(
-                    width: 160,
-                    height: 160,
-                    decoration: BoxDecoration(
-                      color: colors.accent.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Center(
-                      child: Icon(Icons.person, size: 80, color: colors.accent),
-                    ),
+                  Builder(
+                    builder: (context) {
+                      final url = account.avatarUrl?.trim() ?? '';
+                      final fallback = Center(
+                        child: account.initials.isNotEmpty
+                            ? Text(
+                                account.initials,
+                                style: TextStyle(
+                                  fontSize: 56,
+                                  fontWeight: FontWeight.w600,
+                                  color: colors.accent,
+                                ),
+                              )
+                            : Icon(
+                                Icons.person,
+                                size: 80,
+                                color: colors.accent,
+                              ),
+                      );
+
+                      return Container(
+                        width: 160,
+                        height: 160,
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          color: colors.accent.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: url.isEmpty
+                            ? fallback
+                            : Image.network(
+                                url,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => fallback,
+                              ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 16),
 

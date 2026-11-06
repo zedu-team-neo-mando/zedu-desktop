@@ -73,10 +73,11 @@ class FileSharesNotifier extends Notifier<Set<String>> {
         '${names[f.userId] ?? (f.username.isNotEmpty ? f.username : 'A recipient')}: '
             '${f.error.isNotEmpty ? f.error : 'not sent'}',
     ];
-    // Without a list of sent messages, everyone not reported as failed got it.
-    final sent = result.sentTo.isNotEmpty || result.recipients.isNotEmpty
+    // Only server-confirmed deliveries count. An empty reply confirms
+    // nothing, so it sends to nobody instead of assuming full success.
+    final sent = result.sentTo.isNotEmpty
         ? result.sentTo.length
-        : recipients.length - failures.length;
+        : result.recipients.where((r) => r.success).length;
     final total = sent + failures.length;
 
     if (sent <= 0) {

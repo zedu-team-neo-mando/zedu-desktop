@@ -58,9 +58,14 @@ class _ShareFileDialogState extends ConsumerState<ShareFileDialog> {
     if (_error != null) setState(() => _error = null);
   }
 
-  List<OrgMember> _suggestions(List<OrgMember> members) => [
+  /// Members who can still be added: not deactivated, not added yet, and not
+  /// the signed-in user [selfId], who can't share a file with themselves.
+  List<OrgMember> _suggestions(List<OrgMember> members, String? selfId) => [
     for (final m in members)
-      if (!m.deactivated && !_recipients.any((r) => r.id == m.id)) m,
+      if (!m.deactivated &&
+          m.id != selfId &&
+          !_recipients.any((r) => r.id == m.id))
+        m,
   ].take(ShareFileDialog.maxSuggestions).toList();
 
   void _add(OrgMember member) {
@@ -121,7 +126,11 @@ class _ShareFileDialogState extends ConsumerState<ShareFileDialog> {
     );
     final searching = _query.length >= 2;
     final results = searching ? ref.watch(peopleListProvider(_query)) : null;
-    final suggestions = _suggestions(results?.value?.members ?? const []);
+    final selfId = ref.watch(authNotifierProvider.select((s) => s.user?.id));
+    final suggestions = _suggestions(
+      results?.value?.members ?? const [],
+      selfId,
+    );
 
     final labelStyle = context.textTheme.bodyMedium?.copyWith(
       fontSize: 13,

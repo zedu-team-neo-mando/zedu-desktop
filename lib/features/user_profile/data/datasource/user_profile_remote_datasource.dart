@@ -38,7 +38,7 @@ abstract interface class UserProfileRemoteDataSource {
   });
   Future<TeamMemberModel> updateMember(TeamMember member);
   Future<void> removeMember(String memberId);
-  Future<List<RolePermissionModel>> getRolesAndPermissions();
+  Future<List<RolePermissionModel>> getRolesAndPermissions({String? orgId});
   Future<BillingInfoModel> getBillingInfo();
 }
 
@@ -92,9 +92,10 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
   @override
   Future<void> deleteAccount() async {
     if (_config.usesMockData) return;
-    await _apiBaseService.delete<Map<String, dynamic>>(
-      path: '/profile/account',
-    );
+    // There is no DELETE /profile/account on the API; deactivating your own
+    // account is DELETE /users/me (DeactivateSelfUser), so the old path 404'd
+    // and the delete action could never succeed (Ziki #584).
+    await _apiBaseService.delete<Map<String, dynamic>>(path: '/users/me');
   }
 
   @override
@@ -216,6 +217,22 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
   // is remembered on this device. Mobile settings that differ also count.
   static String _mobileOverrideKey(String orgId) =>
       'notification_mobile_override_$orgId';
+
+  // Users carry `full_name`; fall back to the username, then the email, so a
+  // member without a profile name is still recognisable.
+  static String _displayName(Map<String, dynamic> user) {
+    String? nonEmpty(Object? value) {
+      final text = value is String ? value.trim() : '';
+      return text.isEmpty ? null : text;
+    }
+
+    final email = nonEmpty(user['email']);
+    return nonEmpty(user['full_name']) ??
+        nonEmpty(user['name']) ??
+        nonEmpty(user['username']) ??
+        email?.split('@').first ??
+        'Unknown';
+  }
 
   Future<bool> _readMobileOverride(String orgId) async {
     if (!locator.isRegistered<SecureStorageService>()) return false;
@@ -415,9 +432,9 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
       return list;
     }
 
-    if (orgId == null || orgId.length < 36) {
-      orgId = '019700db-4e22-7f90-a20e-f9116291ef24';
-    }
+    // With no workspace selected there are no members to show; never fall
+    // back to another organisation's members (Ziki #1452).
+    if (orgId == null || orgId.isEmpty) return [];
 
     try {
       final response = await _apiBaseService.get<Map<String, dynamic>>(
@@ -433,11 +450,9 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
           email: user['email'] as String? ?? '',
           role: user['role'] as String? ?? 'User',
           dateJoined: user['created_at'] as String? ?? '',
-          status: TeamMemberStatus.active, // Or parse from user['status']
-          name:
-              user['name'] as String? ??
-              user['username'] as String? ??
-              'Unknown',
+          // Pending invites and deactivated members come back here too.
+          status: TeamMemberModel.statusFromJson(user),
+          name: _displayName(user),
           avatarUrl: user['avatar_url'] as String?,
         );
       }).toList();
@@ -528,12 +543,17 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
   }
 
   @override
-  Future<List<RolePermissionModel>> getRolesAndPermissions() async {
+  Future<List<RolePermissionModel>> getRolesAndPermissions({
+    String? orgId,
+  }) async {
     if (_config.usesMockData) {
       return _roles.map(RolePermissionModel.fromJson).toList();
     }
+    // The API serves an organisation's roles at /organisations/{orgId}/roles;
+    // /profile/organization/roles does not exist (#720).
+    if (orgId == null || orgId.isEmpty) return const [];
     final response = await _apiBaseService.get<Map<String, dynamic>>(
-      path: '/profile/organization/roles',
+      path: '/organisations/$orgId/roles',
     );
     final data = response.data['data'] as List<dynamic>;
     return data
