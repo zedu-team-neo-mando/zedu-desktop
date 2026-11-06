@@ -282,9 +282,20 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     }
 
     if (isEdit) {
-      ref
-          .read(chatHistoryProvider(widget.channelId))
-          .saveEdit(_editingMessageId!, text);
+      unawaited(
+        ref
+            .read(chatHistoryProvider(widget.channelId))
+            .saveEdit(_editingMessageId!, text)
+            .then((saved) {
+              if (saved || !mounted) return;
+              AppToastService.show(
+                context,
+                type: AppToastType.error,
+                message:
+                    'Could not save your edit. The message keeps its previous text.',
+              );
+            }),
+      );
       // An edit sends nothing new: the unsent reply and its draft come back,
       // and a waiting voice note or file is kept.
       _exitEditMode();
@@ -673,11 +684,8 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     } catch (_) {}
   }
 
-  String _formatSeconds(int total) {
-    final minutes = total ~/ 60;
-    final seconds = (total % 60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
-  }
+  String _formatSeconds(int total) =>
+      formatClockDuration(Duration(seconds: total));
 
   Widget _buildRecordingBar(AppPalette colors) {
     return Padding(
@@ -820,15 +828,23 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
       type: FileType.any,
     );
     if (result == null) return;
-    // The paths come from the system file dialog, so there is no traversal to
-    // guard against: on macOS and Linux every one of them starts with '/', and
-    // a name such as `notes..v2.txt` is ordinary. `addFiles` checks that each
-    // file exists and is under the size limit. The MIME type is left unset
-    // because the upload works it out from the file name; `f.extension` is a
-    // bare extension such as `pdf`, not a MIME type.
     final picked = result.files
         .where((PlatformFile f) => f.path != null)
-        .map((PlatformFile f) => XFile(f.path!, name: f.name))
+        .map((PlatformFile f) {
+          // Validate file path to prevent path traversal and invalid files
+          if (f.path == null ||
+              f.path!.contains('..') ||
+              f.path!.startsWith('/')) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Invalid file path: ${f.path}')),
+              );
+            }
+            return null;
+          }
+          return XFile(f.path!, name: f.name, mimeType: f.extension);
+        })
+        .whereType<XFile>()
         .toList();
     await addFiles(picked);
   }

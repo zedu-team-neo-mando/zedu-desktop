@@ -1,3 +1,5 @@
+import 'dart:io' show File;
+
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -60,24 +62,63 @@ String _canonicalCountryName(String value) {
 /// save succeeded.
 typedef EditProfileSave = Future<String?> Function(ProfileAccount account);
 
+/// Uploads the image at a file path as the profile photo; returns an error
+/// message, or null on success.
+typedef EditProfilePhotoUpload = Future<String?> Function(String filePath);
+
+/// Removes the profile photo; returns an error message, or null on success.
+typedef EditProfilePhotoRemove = Future<String?> Function();
+
+/// Lets the user choose an image; returns its path, or null when cancelled.
+typedef EditProfilePhotoPicker = Future<String?> Function();
+
+/// The photo types the API accepts, as on Zedu web.
+const kProfilePhotoExtensions = ['jpg', 'jpeg', 'png'];
+
+Future<String?> _pickProfilePhoto() async {
+  final result = await FilePicker.pickFiles(
+    type: FileType.custom,
+    allowedExtensions: kProfilePhotoExtensions,
+  );
+  return result?.files.single.path;
+}
+
 /// Opens the editor. It stays open while [onSave] runs and closes only when
 /// the save succeeds; on failure it keeps the draft and shows the error.
 Future<void> showEditProfileDialog(
   BuildContext context,
   ProfileAccount account,
-  EditProfileSave onSave,
-) async {
+  EditProfileSave onSave, {
+  EditProfilePhotoUpload? onUploadPhoto,
+  EditProfilePhotoRemove? onRemovePhoto,
+  EditProfilePhotoPicker pickPhoto = _pickProfilePhoto,
+}) async {
   await showDialog<void>(
     context: context,
-    builder: (context) => _EditProfileDialog(account: account, onSave: onSave),
+    builder: (context) => _EditProfileDialog(
+      account: account,
+      onSave: onSave,
+      onUploadPhoto: onUploadPhoto,
+      onRemovePhoto: onRemovePhoto,
+      pickPhoto: pickPhoto,
+    ),
   );
 }
 
 class _EditProfileDialog extends StatefulWidget {
-  const _EditProfileDialog({required this.account, required this.onSave});
+  const _EditProfileDialog({
+    required this.account,
+    required this.onSave,
+    required this.pickPhoto,
+    this.onUploadPhoto,
+    this.onRemovePhoto,
+  });
 
   final ProfileAccount account;
   final EditProfileSave onSave;
+  final EditProfilePhotoUpload? onUploadPhoto;
+  final EditProfilePhotoRemove? onRemovePhoto;
+  final EditProfilePhotoPicker pickPhoto;
 
   @override
   State<_EditProfileDialog> createState() => _EditProfileDialogState();
@@ -97,6 +138,9 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   late String selectedTimezone;
   late String selectedCountry;
 
+  bool _saving = false;
+  String? _saveError;
+
   late final String _initialName;
   late final String _initialDisplayName;
   late final String _initialUsername;
@@ -107,9 +151,87 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   late final String _initialTimezone;
   late final String _initialCountry;
 
-  bool _saving = false;
-  String? _saveError;
   bool _discardConfirmed = false;
+
+  /// The saved photo's link, or null once it is removed.
+  String? _photoUrl;
+
+  /// A photo uploaded in this dialog, shown until the account reloads.
+  String? _uploadedPhotoPath;
+  bool _photoBusy = false;
+  String? _photoError;
+
+  bool get _hasPhoto =>
+      _uploadedPhotoPath != null || (_photoUrl?.isNotEmpty ?? false);
+
+  Future<void> _uploadPhoto() async {
+    final upload = widget.onUploadPhoto;
+    if (upload == null || _photoBusy) return;
+    final path = await widget.pickPhoto();
+    if (path == null || !mounted) return;
+    final ext = path.split('.').last.toLowerCase();
+    if (!kProfilePhotoExtensions.contains(ext)) {
+      setState(() => _photoError = 'Choose a JPG or PNG image.');
+      return;
+    }
+    setState(() {
+      _photoBusy = true;
+      _photoError = null;
+    });
+    final error = await upload(path);
+    if (!mounted) return;
+    setState(() {
+      _photoBusy = false;
+      if (error == null) {
+        _uploadedPhotoPath = path;
+      } else {
+        _photoError = error;
+      }
+    });
+  }
+
+  Future<void> _removePhoto() async {
+    final remove = widget.onRemovePhoto;
+    if (remove == null || _photoBusy) return;
+    setState(() {
+      _photoBusy = true;
+      _photoError = null;
+    });
+    final error = await remove();
+    if (!mounted) return;
+    setState(() {
+      _photoBusy = false;
+      if (error == null) {
+        _uploadedPhotoPath = null;
+        _photoUrl = null;
+      } else {
+        _photoError = error;
+      }
+    });
+  }
+
+  Widget _photoPlaceholder(AppPalette colors) =>
+      Icon(Icons.person, size: 80, color: colors.accent);
+
+  Widget _photoPreview(AppPalette colors) {
+    final uploaded = _uploadedPhotoPath;
+    if (uploaded != null) {
+      return Image.file(
+        File(uploaded),
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _photoPlaceholder(colors),
+      );
+    }
+    final url = _photoUrl;
+    if (url != null && url.isNotEmpty) {
+      return Image.network(
+        url,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _photoPlaceholder(colors),
+      );
+    }
+    return _photoPlaceholder(colors);
+  }
 
   @override
   void initState() {
@@ -126,6 +248,7 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
 
     selectedTimezone = normalizeProfileTimezone(widget.account.timezone);
     selectedCountry = widget.account.country;
+    _photoUrl = widget.account.avatarUrl;
 
     _initialName = nameCtrl.text;
     _initialDisplayName = displayNameCtrl.text;
@@ -221,6 +344,17 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
 
   @override
   void dispose() {
+    for (final controller in [
+      nameCtrl,
+      displayNameCtrl,
+      usernameCtrl,
+      emailCtrl,
+      phoneCtrl,
+      titleCtrl,
+      pronunciationCtrl,
+    ]) {
+      controller.removeListener(_onFieldChanged);
+    }
     nameCtrl.dispose();
     displayNameCtrl.dispose();
     usernameCtrl.dispose();
@@ -253,7 +387,6 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
     // Closed with Cancel while saving: nothing left to update or pop.
     if (!mounted) return;
     if (error == null) {
-      setState(() => _discardConfirmed = true);
       Navigator.pop(context);
       return;
     }
@@ -267,370 +400,371 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return PopScope(
-      canPop: _canPop,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        _requestClose();
-      },
-      child: Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Container(
-          width: 640,
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.85,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 24, 16, 0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Edit your profile',
-                        style: context.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: colors.textPrimary,
-                        ),
+    final dialog = Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        width: 640,
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 16, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Edit your profile',
+                      style: context.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: colors.textPrimary,
                       ),
                     ),
-                    IconButton(
-                      tooltip: 'Close',
-                      onPressed: _requestClose,
-                      icon: Icon(Icons.close, color: colors.textHint),
-                    ),
-                  ],
-                ),
+                  ),
+                  IconButton(
+                    tooltip: 'Close',
+                    onPressed: _requestClose,
+                    icon: Icon(Icons.close, color: colors.textHint),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              Divider(height: 0, color: colors.divider),
+            ),
+            const SizedBox(height: 8),
+            Divider(height: 0, color: colors.divider),
 
-              // Scrollable form body
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
-                  child: Form(
-                    key: formKey,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Left column — form fields
-                        Expanded(
-                          flex: 3,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              AppTextField(
-                                label: 'Full Name',
-                                controller: nameCtrl,
-                                hint: 'Enter your full name',
-                                validator: (v) =>
-                                    (v == null || v.trim().isEmpty)
-                                    ? 'Name is required'
-                                    : null,
-                              ),
-                              const SizedBox(height: 16),
-                              AppTextField(
-                                label: 'Display Name',
-                                controller: displayNameCtrl,
-                                hint: 'Enter display name',
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Text(
-                                  'This could be your first name, or a nickname — however you\'d like people to refer to you.',
-                                  style: context.textTheme.bodySmall?.copyWith(
-                                    color: colors.textHint,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              AppTextField(
-                                label: 'Username',
-                                controller: usernameCtrl,
-                                hint: 'Enter username',
-                              ),
-                              const SizedBox(height: 16),
-                              AppTextField(
-                                label: 'Email',
-                                controller: emailCtrl,
-                                hint: 'Enter your email',
-                                keyboardType: TextInputType.emailAddress,
-                                validator: (v) {
-                                  if (v == null || v.trim().isEmpty) {
-                                    return 'Email is required';
-                                  }
-                                  return Validators.validateEmail(
-                                    context,
-                                    v.trim(),
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 16),
-                              AppTextField(
-                                label: 'Phone Number',
-                                controller: phoneCtrl,
-                                hint: '+1 234 567 8900',
-                                keyboardType: TextInputType.phone,
-                              ),
-                              const SizedBox(height: 16),
-                              AppTextField(
-                                label: 'Title',
-                                controller: titleCtrl,
-                                hint: 'e.g. Product Manager',
-                              ),
-                              const SizedBox(height: 16),
-                              AppTextField(
-                                label: 'Name Pronunciation',
-                                controller: pronunciationCtrl,
-                                hint: "e.g. Zoe (pronounced 'zo-ee')",
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Text(
-                                  'This could be a phonetic pronunciation, or an example of something your name sounds like.',
-                                  style: context.textTheme.bodySmall?.copyWith(
-                                    color: colors.textHint,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-
-                              // Timezone dropdown
-                              ProfileFieldLabel('Timezone'),
-                              const SizedBox(height: 6),
-                              DropdownButtonFormField<String>(
-                                initialValue: selectedTimezone,
-                                isExpanded: true,
-                                decoration: InputDecoration(
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(6),
-                                    borderSide: BorderSide(
-                                      color: colors.divider,
-                                    ),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(6),
-                                    borderSide: BorderSide(
-                                      color: colors.divider,
-                                    ),
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 14,
-                                  ),
-                                ),
-                                items: [
-                                  if (!_kTimezones.containsKey(
-                                    selectedTimezone,
-                                  ))
-                                    DropdownMenuItem(
-                                      value: selectedTimezone,
-                                      child: Text(
-                                        selectedTimezone,
-                                        style: context.textTheme.bodySmall,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ..._kTimezones.entries.map(
-                                    (tz) => DropdownMenuItem(
-                                      value: tz.key,
-                                      child: Text(
-                                        tz.value,
-                                        style: context.textTheme.bodySmall,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                                onChanged: (v) => setState(
-                                  () =>
-                                      selectedTimezone = v ?? selectedTimezone,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-
-                              // Country dropdown (searchable)
-                              ProfileFieldLabel('Country'),
-                              const SizedBox(height: 6),
-                              Autocomplete<String>(
-                                initialValue: TextEditingValue(
-                                  text: selectedCountry,
-                                ),
-                                optionsBuilder: (textEditingValue) {
-                                  if (textEditingValue.text.isEmpty) {
-                                    return kCountries;
-                                  }
-                                  return kCountries.where(
-                                    (c) => c.toLowerCase().contains(
-                                      textEditingValue.text.toLowerCase(),
-                                    ),
-                                  );
-                                },
-                                onSelected: (value) {
-                                  setState(() => selectedCountry = value);
-                                },
-                                fieldViewBuilder:
-                                    (
-                                      context,
-                                      controller,
-                                      focusNode,
-                                      onFieldSubmitted,
-                                    ) {
-                                      return TextFormField(
-                                        controller: controller,
-                                        focusNode: focusNode,
-                                        onChanged: (value) => setState(
-                                          () => selectedCountry =
-                                              _canonicalCountryName(value),
-                                        ),
-                                        validator: (value) {
-                                          final country = _canonicalCountryName(
-                                            value ?? '',
-                                          );
-                                          if (country.isEmpty ||
-                                              kCountries.contains(country)) {
-                                            return null;
-                                          }
-                                          return 'Select a country from the list';
-                                        },
-                                        decoration: InputDecoration(
-                                          hintText:
-                                              'Search or select a country',
-                                          hintStyle: context.textTheme.bodySmall
-                                              ?.copyWith(
-                                                color: colors.textHint,
-                                              ),
-                                          border: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              6,
-                                            ),
-                                            borderSide: BorderSide(
-                                              color: colors.divider,
-                                            ),
-                                          ),
-                                          enabledBorder: OutlineInputBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              6,
-                                            ),
-                                            borderSide: BorderSide(
-                                              color: colors.divider,
-                                            ),
-                                          ),
-                                          contentPadding:
-                                              const EdgeInsets.symmetric(
-                                                horizontal: 12,
-                                                vertical: 14,
-                                              ),
-                                          suffixIcon: Icon(
-                                            Icons.keyboard_arrow_down,
-                                            color: colors.textHint,
-                                          ),
-                                        ),
-                                        style: context.textTheme.bodySmall,
-                                        onFieldSubmitted: (_) =>
-                                            onFieldSubmitted(),
-                                      );
-                                    },
-                                optionsViewBuilder:
-                                    (context, onSelected, options) {
-                                      return Align(
-                                        alignment: Alignment.topLeft,
-                                        child: Material(
-                                          elevation: 4,
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          child: Container(
-                                            width: 360,
-                                            constraints: const BoxConstraints(
-                                              maxHeight: 240,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: colors.background,
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                              border: Border.all(
-                                                color: colors.divider,
-                                              ),
-                                            ),
-                                            child: ListView.builder(
-                                              padding: EdgeInsets.zero,
-                                              shrinkWrap: true,
-                                              itemCount: options.length,
-                                              itemBuilder: (context, index) {
-                                                final option = options
-                                                    .elementAt(index);
-                                                return InkWell(
-                                                  onTap: () =>
-                                                      onSelected(option),
-                                                  child: Padding(
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                          horizontal: 12,
-                                                          vertical: 10,
-                                                        ),
-                                                    child: Text(
-                                                      option,
-                                                      style: context
-                                                          .textTheme
-                                                          .bodySmall,
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    },
-                              ),
-                              const SizedBox(height: 16),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 24),
-
-                        // Right column — profile photo
-                        Expanded(
-                          flex: 2,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Profile Photo',
-                                style: context.textTheme.labelSmall?.copyWith(
+            // Scrollable form body
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+                child: Form(
+                  key: formKey,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Left column — form fields
+                      Expanded(
+                        flex: 3,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AppTextField(
+                              label: 'Full Name',
+                              controller: nameCtrl,
+                              hint: 'Enter your full name',
+                              validator: (v) => (v == null || v.trim().isEmpty)
+                                  ? 'Name is required'
+                                  : null,
+                            ),
+                            const SizedBox(height: 16),
+                            AppTextField(
+                              label: 'Display Name',
+                              controller: displayNameCtrl,
+                              hint: 'Enter display name',
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                'This could be your first name, or a nickname — however you\'d like people to refer to you.',
+                                style: context.textTheme.bodySmall?.copyWith(
                                   color: colors.textHint,
-                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
-                              const SizedBox(height: 12),
-                              Center(
-                                child: Container(
-                                  width: 160,
-                                  height: 160,
-                                  decoration: BoxDecoration(
-                                    color: colors.accent.withValues(
-                                      alpha: 0.15,
+                            ),
+                            const SizedBox(height: 16),
+                            AppTextField(
+                              label: 'Username',
+                              controller: usernameCtrl,
+                              hint: 'Enter username',
+                            ),
+                            const SizedBox(height: 16),
+                            AppTextField(
+                              label: 'Email',
+                              controller: emailCtrl,
+                              hint: 'Enter your email',
+                              keyboardType: TextInputType.emailAddress,
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) {
+                                  return 'Email is required';
+                                }
+                                return Validators.validateEmail(
+                                  context,
+                                  v.trim(),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            AppTextField(
+                              label: 'Phone Number',
+                              controller: phoneCtrl,
+                              hint: '+1 234 567 8900',
+                              keyboardType: TextInputType.phone,
+                            ),
+                            const SizedBox(height: 16),
+                            AppTextField(
+                              label: 'Title',
+                              controller: titleCtrl,
+                              hint: 'e.g. Product Manager',
+                            ),
+                            const SizedBox(height: 16),
+                            AppTextField(
+                              label: 'Name Pronunciation',
+                              controller: pronunciationCtrl,
+                              hint: "e.g. Zoe (pronounced 'zo-ee')",
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                'This could be a phonetic pronunciation, or an example of something your name sounds like.',
+                                style: context.textTheme.bodySmall?.copyWith(
+                                  color: colors.textHint,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Timezone dropdown
+                            ProfileFieldLabel('Timezone'),
+                            const SizedBox(height: 6),
+                            DropdownButtonFormField<String>(
+                              initialValue: selectedTimezone,
+                              isExpanded: true,
+                              decoration: InputDecoration(
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                  borderSide: BorderSide(color: colors.divider),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                  borderSide: BorderSide(color: colors.divider),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 14,
+                                ),
+                              ),
+                              items: [
+                                if (!_kTimezones.containsKey(selectedTimezone))
+                                  DropdownMenuItem(
+                                    value: selectedTimezone,
+                                    child: Text(
+                                      selectedTimezone,
+                                      style: context.textTheme.bodySmall,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: Icon(
-                                    Icons.person,
-                                    size: 80,
-                                    color: colors.accent,
+                                ..._kTimezones.entries.map(
+                                  (tz) => DropdownMenuItem(
+                                    value: tz.key,
+                                    child: Text(
+                                      tz.value,
+                                      style: context.textTheme.bodySmall,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                 ),
+                              ],
+                              onChanged: (v) => setState(
+                                () => selectedTimezone = v ?? selectedTimezone,
                               ),
-                              const SizedBox(height: 12),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Country dropdown (searchable)
+                            ProfileFieldLabel('Country'),
+                            const SizedBox(height: 6),
+                            Autocomplete<String>(
+                              initialValue: TextEditingValue(
+                                text: selectedCountry,
+                              ),
+                              optionsBuilder: (textEditingValue) {
+                                if (textEditingValue.text.isEmpty) {
+                                  return kCountries;
+                                }
+                                return kCountries.where(
+                                  (c) => c.toLowerCase().contains(
+                                    textEditingValue.text.toLowerCase(),
+                                  ),
+                                );
+                              },
+                              onSelected: (value) {
+                                setState(() => selectedCountry = value);
+                              },
+                              fieldViewBuilder:
+                                  (
+                                    context,
+                                    controller,
+                                    focusNode,
+                                    onFieldSubmitted,
+                                  ) {
+                                    return TextFormField(
+                                      controller: controller,
+                                      focusNode: focusNode,
+                                      onChanged: (value) => selectedCountry =
+                                          _canonicalCountryName(value),
+                                      validator: (value) {
+                                        final country = _canonicalCountryName(
+                                          value ?? '',
+                                        );
+                                        if (country.isEmpty ||
+                                            kCountries.contains(country)) {
+                                          return null;
+                                        }
+                                        return 'Select a country from the list';
+                                      },
+                                      decoration: InputDecoration(
+                                        hintText: 'Search or select a country',
+                                        hintStyle: context.textTheme.bodySmall
+                                            ?.copyWith(color: colors.textHint),
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: colors.divider,
+                                          ),
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                          borderSide: BorderSide(
+                                            color: colors.divider,
+                                          ),
+                                        ),
+                                        contentPadding:
+                                            const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 14,
+                                            ),
+                                        suffixIcon: Icon(
+                                          Icons.keyboard_arrow_down,
+                                          color: colors.textHint,
+                                        ),
+                                      ),
+                                      style: context.textTheme.bodySmall,
+                                      onFieldSubmitted: (_) =>
+                                          onFieldSubmitted(),
+                                    );
+                                  },
+                              optionsViewBuilder: (context, onSelected, options) {
+                                return Align(
+                                  alignment: Alignment.topLeft,
+                                  child: Material(
+                                    elevation: 4,
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      width: 360,
+                                      constraints: const BoxConstraints(
+                                        maxHeight: 240,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: colors.background,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: colors.divider,
+                                        ),
+                                      ),
+                                      child: ListView.builder(
+                                        padding: EdgeInsets.zero,
+                                        shrinkWrap: true,
+                                        itemCount: options.length,
+                                        itemBuilder: (context, index) {
+                                          final option = options.elementAt(
+                                            index,
+                                          );
+                                          // The row the arrow keys moved
+                                          // to, which Enter picks.
+                                          final highlighted =
+                                              AutocompleteHighlightedOption.of(
+                                                context,
+                                              ) ==
+                                              index;
+                                          if (highlighted) {
+                                            WidgetsBinding.instance
+                                                .addPostFrameCallback((_) {
+                                                  if (context.mounted) {
+                                                    Scrollable.ensureVisible(
+                                                      context,
+                                                      alignment: 0.5,
+                                                    );
+                                                  }
+                                                });
+                                          }
+                                          return Semantics(
+                                            selected: highlighted,
+                                            child: Material(
+                                              color: highlighted
+                                                  ? colors.primaryBg
+                                                  : Colors.transparent,
+                                              child: InkWell(
+                                                onTap: () => onSelected(option),
+                                                child: Padding(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 10,
+                                                      ),
+                                                  child: Text(
+                                                    option,
+                                                    style: context
+                                                        .textTheme
+                                                        .bodySmall,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 24),
+
+                      // Right column — profile photo
+                      Expanded(
+                        flex: 2,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Profile Photo',
+                              style: context.textTheme.labelSmall?.copyWith(
+                                color: colors.textHint,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Center(
+                              child: Container(
+                                width: 160,
+                                height: 160,
+                                clipBehavior: Clip.antiAlias,
+                                decoration: BoxDecoration(
+                                  color: colors.accent.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: _photoBusy
+                                    ? const Center(
+                                        child: CircularProgressIndicator(),
+                                      )
+                                    : _photoPreview(colors),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            if (widget.onUploadPhoto != null)
                               Center(
                                 child: TextButton.icon(
-                                  onPressed: () {
-                                    // Upload photo placeholder
-                                  },
+                                  onPressed: _photoBusy ? null : _uploadPhoto,
                                   icon: Icon(
                                     Icons.upload_outlined,
                                     size: 16,
@@ -646,71 +780,90 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
                                   ),
                                 ),
                               ),
+                            if (widget.onRemovePhoto != null)
                               Center(
                                 child: TextButton(
-                                  onPressed: () {
-                                    // Remove photo placeholder
-                                  },
+                                  onPressed: _photoBusy || !_hasPhoto
+                                      ? null
+                                      : _removePhoto,
                                   child: Text(
                                     'Remove photo',
                                     style: context.textTheme.bodySmall
                                         ?.copyWith(
-                                          color: colors.error,
+                                          color: _hasPhoto
+                                              ? colors.error
+                                              : colors.textHint,
                                           fontWeight: FontWeight.w500,
                                         ),
                                   ),
                                 ),
                               ),
-                            ],
-                          ),
+                            if (_photoError != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  _photoError!,
+                                  textAlign: TextAlign.center,
+                                  style: context.textTheme.bodySmall?.copyWith(
+                                    color: colors.error,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
+            ),
 
-              // Footer
-              Divider(height: 0, color: colors.divider),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 16,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    if (_saveError != null)
-                      Expanded(
-                        child: Text(
-                          _saveError!,
-                          style: context.textTheme.bodySmall?.copyWith(
-                            color: colors.error,
-                          ),
+            // Footer
+            Divider(height: 0, color: colors.divider),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (_saveError != null)
+                    Expanded(
+                      child: Text(
+                        _saveError!,
+                        style: context.textTheme.bodySmall?.copyWith(
+                          color: colors.error,
                         ),
                       ),
-                    TextButton(
-                      onPressed: _requestClose,
-                      child: Text(
-                        'Cancel',
-                        style: TextStyle(color: colors.textPrimary),
-                      ),
                     ),
-                    const SizedBox(width: 12),
-                    AppButton(
-                      label: 'Save changes',
-                      expand: false,
-                      height: 40,
-                      loading: _saving,
-                      onPressed: _saving ? null : _save,
+                  TextButton(
+                    onPressed: _requestClose,
+                    child: Text(
+                      'Cancel',
+                      style: TextStyle(color: colors.textPrimary),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 12),
+                  AppButton(
+                    label: 'Save changes',
+                    expand: false,
+                    height: 40,
+                    loading: _saving,
+                    onPressed: _saving ? null : _save,
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
+    );
+
+    return PopScope(
+      canPop: _canPop,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _requestClose();
+      },
+      child: dialog,
     );
   }
 }

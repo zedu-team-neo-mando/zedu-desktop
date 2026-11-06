@@ -259,18 +259,20 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
                   onTap: () => setState(() => _isMuted = !_isMuted),
                   small: false,
                 ),
-                const SizedBox(width: 16),
-                _buildControlButton(
-                  icon: Icons.screen_share_outlined,
-                  tooltip: 'Share screen',
-                  color: colors.primary.withValues(alpha: 0.2),
-                  onTap: () => AppToastService.show(
-                    context,
-                    type: AppToastType.info,
-                    message: 'Screen sharing is not available yet.',
+                if (kUnfinishedFeaturesEnabled) ...[
+                  const SizedBox(width: 16),
+                  _buildControlButton(
+                    icon: Icons.screen_share_outlined,
+                    tooltip: 'Share screen',
+                    color: colors.primary.withValues(alpha: 0.2),
+                    onTap: () => AppToastService.show(
+                      context,
+                      type: AppToastType.info,
+                      message: 'Screen sharing is not available yet.',
+                    ),
+                    small: false,
                   ),
-                  small: false,
-                ),
+                ],
                 const SizedBox(width: 16),
                 _buildControlButton(
                   icon: _isVideoOff ? Icons.videocam_off : Icons.videocam,
@@ -328,12 +330,13 @@ class _BuzzMeetingViewState extends ConsumerState<BuzzMeetingView> {
             child: CircleAvatar(
               radius: 24,
               backgroundColor: const Color(0xFF6458F5),
-              backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+              foregroundImage: avatarUrl != null && avatarUrl.isNotEmpty
                   ? NetworkImage(avatarUrl)
                   : null,
-              child: avatarUrl == null || avatarUrl.isEmpty
-                  ? Icon(Icons.person, size: 24, color: Colors.white)
+              onForegroundImageError: avatarUrl != null && avatarUrl.isNotEmpty
+                  ? ignoreAvatarError
                   : null,
+              child: Icon(Icons.person, size: 24, color: Colors.white),
             ),
           ),
           Positioned(
