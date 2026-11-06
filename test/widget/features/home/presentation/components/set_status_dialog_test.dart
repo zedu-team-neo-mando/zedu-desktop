@@ -164,6 +164,30 @@ void main() {
       );
     });
 
+    testWidgets('clear button appears while typing and empties the field', (
+      tester,
+    ) async {
+      await _pumpDialog(tester);
+
+      // Only the header's close button is there before anything is typed.
+      expect(find.byIcon(Icons.close), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), 'Deep work');
+      await tester.pump();
+
+      // The clear action joins it once the field has text.
+      expect(find.byIcon(Icons.close), findsNWidgets(2));
+
+      await tester.tap(find.byIcon(Icons.close).last);
+      await tester.pump();
+
+      expect(
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        isEmpty,
+      );
+      expect(find.byIcon(Icons.close), findsOneWidget);
+    });
+
     testWidgets('editing the status text clears the selection', (tester) async {
       await _pumpDialog(tester);
 
