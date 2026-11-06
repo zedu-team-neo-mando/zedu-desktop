@@ -114,6 +114,7 @@ class _HomeAppBar extends ConsumerWidget {
             ),
           ),
           const Spacer(),
+          const HelpMenuButton(),
         ],
       ),
     );

@@ -10,3 +10,4 @@ export 'notifications_dialog.dart';
 export 'dm_empty_state.dart';
 export 'sidebar_channel_list.dart';
 export 'window_title_listener.dart';
+export 'help_menu_button.dart';

@@ -28,6 +28,13 @@ enum LogLevel {
 abstract final class AppLogger {
   AppLogger._();
 
+  /// Recent log entries kept in memory so diagnostics export can include them.
+  static const int _bufferCapacity = 2000;
+  static final List<_LogEntry> _buffer = [];
+
+  /// The most recent entries, oldest first, formatted one per line.
+  static String logDump() => _buffer.map((e) => e.render()).join('\n');
+
   static void v(String message, {String? tag}) =>
       _log(LogLevel.verbose, message, tag: tag);
 
@@ -85,13 +92,28 @@ abstract final class AppLogger {
   }) {
     if (kReleaseMode && level.value < LogLevel.warning.value) return;
 
+    final time = DateTime.now();
+    _buffer.add(
+      _LogEntry(
+        level: level,
+        time: time,
+        tag: tag,
+        message: message,
+        error: error,
+        stackTrace: stackTrace,
+      ),
+    );
+    if (_buffer.length > _bufferCapacity) {
+      _buffer.removeRange(0, _buffer.length - _bufferCapacity);
+    }
+
     dev.log(
       kDebugMode ? '${_prefix(level)}$message\x1B[0m' : message,
       name: tag ?? 'AppLogger',
       level: level.value,
       error: error,
       stackTrace: stackTrace,
-      time: DateTime.now(),
+      time: time,
     );
   }
 
@@ -103,4 +125,32 @@ abstract final class AppLogger {
     LogLevel.error => '\x1B[31m[E] ', // red
     LogLevel.fatal => '\x1B[1;31m[F] ', // bold bright red
   };
+}
+
+class _LogEntry {
+  _LogEntry({
+    required this.level,
+    required this.time,
+    required this.message,
+    this.tag,
+    this.error,
+    this.stackTrace,
+  });
+
+  final LogLevel level;
+  final DateTime time;
+  final String? tag;
+  final String message;
+  final Object? error;
+  final StackTrace? stackTrace;
+
+  String render() {
+    final buffer = StringBuffer(
+      '${time.toIso8601String()} [${level.name.toUpperCase()}] '
+      '${tag ?? 'AppLogger'}: $message',
+    );
+    if (error != null) buffer.write('\n  error: $error');
+    if (stackTrace != null) buffer.write('\n  stack: $stackTrace');
+    return buffer.toString();
+  }
 }
