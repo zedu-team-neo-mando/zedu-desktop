@@ -5,16 +5,18 @@ abstract class PlannerRemoteDataSource {
   Future<List<Checkpoint>> fetchCheckpoints(PlannerQuery query);
 }
 
-/// Reads the workspace's checkpoints from the same API the web planner uses.
-/// The server picks the organisation from the signed-in session, and decides
-/// what a learner may see.
+/// Reads the workspace's checkpoints.
+/// The server is expected to pick the organisation from the signed-in session
+/// and to decide what a learner may see. The path below is NOT confirmed: no
+/// route serves it in the API today (see the PR's Backend section), so every
+/// call currently lands on a 404 and the view shows its error state.
 class PlannerRemoteDataSourceImpl implements PlannerRemoteDataSource {
   PlannerRemoteDataSourceImpl({required this.apiBaseService});
 
   final ApiBaseService apiBaseService;
 
-  /// Kept in one place so the path is easy to correct when the web app's
-  /// planner endpoint settles.
+  /// Kept in one place so the path is easy to correct once the real endpoint
+  /// is agreed with the backend.
   static const checkpointsPath = '/planner/checkpoints';
 
   @override
