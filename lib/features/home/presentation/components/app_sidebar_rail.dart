@@ -68,45 +68,52 @@ class _AppSidebarRailState extends ConsumerState<AppSidebarRail> {
       child: Column(
         children: [
           const SizedBox(height: 10),
-          _RailNavItem(
-            icon: Icons.home_filled,
-            label: 'Home',
-            isActive: activeType == HomeSidebarType.home,
-            onTap: () => select(HomeSidebarType.home),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  _RailNavItem(
+                    icon: Icons.home_filled,
+                    label: 'Home',
+                    isActive: activeType == HomeSidebarType.home,
+                    onTap: () => select(HomeSidebarType.home),
+                  ),
+                  _RailNavItem(
+                    icon: Icons.chat_bubble_outline,
+                    label: 'DMs',
+                    popoutType: HomeSidebarType.dms,
+                    positionKey: dmsTargetKey,
+                    isActive: activeType == HomeSidebarType.dms,
+                    onTap: () => select(HomeSidebarType.dms),
+                  ),
+                  _RailNavItem(
+                    icon: Icons.people_outline,
+                    label: 'People',
+                    popoutType: HomeSidebarType.people,
+                    positionKey: peopleTargetKey,
+                    isActive: activeType == HomeSidebarType.people,
+                    onTap: () => select(HomeSidebarType.people),
+                  ),
+                  _RailNavItem(
+                    icon: Icons.folder_open_outlined,
+                    label: 'Files',
+                    isActive: activeType == HomeSidebarType.files,
+                    onTap: () => select(HomeSidebarType.files),
+                  ),
+                  _RailNavItem(
+                    icon: Icons.checklist_rounded,
+                    label: 'Planner',
+                    isActive: activeType == HomeSidebarType.planner,
+                    onTap: () => select(HomeSidebarType.planner),
+                  ),
+                  _BuzzRailItem(
+                    isActive: activeType == HomeSidebarType.buzz,
+                    onTap: () => select(HomeSidebarType.buzz),
+                  ),
+                ],
+              ),
+            ),
           ),
-          _RailNavItem(
-            icon: Icons.chat_bubble_outline,
-            label: 'DMs',
-            popoutType: HomeSidebarType.dms,
-            positionKey: dmsTargetKey,
-            isActive: activeType == HomeSidebarType.dms,
-            onTap: () => select(HomeSidebarType.dms),
-          ),
-          _RailNavItem(
-            icon: Icons.people_outline,
-            label: 'People',
-            popoutType: HomeSidebarType.people,
-            positionKey: peopleTargetKey,
-            isActive: activeType == HomeSidebarType.people,
-            onTap: () => select(HomeSidebarType.people),
-          ),
-          _RailNavItem(
-            icon: Icons.folder_open_outlined,
-            label: 'Files',
-            isActive: activeType == HomeSidebarType.files,
-            onTap: () => select(HomeSidebarType.files),
-          ),
-          _RailNavItem(
-            icon: Icons.checklist_rounded,
-            label: 'Planner',
-            isActive: activeType == HomeSidebarType.planner,
-            onTap: () => select(HomeSidebarType.planner),
-          ),
-          _BuzzRailItem(
-            isActive: activeType == HomeSidebarType.buzz,
-            onTap: () => select(HomeSidebarType.buzz),
-          ),
-          const Spacer(),
           _RailBottomIcon(
             icon: Icons.notifications_none_outlined,
             // No unread-count source yet; show the dot once there is one.
