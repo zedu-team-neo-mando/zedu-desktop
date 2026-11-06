@@ -21,6 +21,28 @@ class _FakeWorkspaceNotifier extends WorkspaceNotifier {
   WorkspaceState build() => const WorkspaceState();
 }
 
+class _FakeSignedInAuthNotifier extends AuthNotifier {
+  @override
+  AuthState build() => AuthState(
+    status: AuthStatus.authenticated,
+    user: User(
+      id: 'user-1',
+      firstName: 'Test',
+      lastName: 'User',
+      email: 'test@example.com',
+      phone: '',
+      username: 'testuser',
+      isVerified: true,
+      isOnboarded: true,
+      createdAt: DateTime(2026),
+      currentOrg: 'org-1',
+      currentOrganisationSlug: 'test-org',
+      avatarUrl: '',
+      defaultAvatarUrl: '',
+    ),
+  );
+}
+
 class _FakeDmListNotifier extends DmListNotifier {
   _FakeDmListNotifier(this._conversations);
 
@@ -47,6 +69,7 @@ Future<void> _pumpSidebar(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
+        authNotifierProvider.overrideWith(_FakeSignedInAuthNotifier.new),
         workspaceProvider.overrideWith(_FakeWorkspaceNotifier.new),
         dmDraftStoreProvider.overrideWith(
           (ref) => DmDraftStore(
@@ -147,5 +170,53 @@ void main() {
     await _pumpSidebar(tester, const []);
 
     expect(find.text('No recent chats'), findsOneWidget);
+  });
+
+  testWidgets('pins self DM to the top and renders (you) badge', (
+    tester,
+  ) async {
+    final list = [
+      _conversation('channel-1', 'Ada Okafor'),
+      DmConversation(
+        channelId: 'channel-self',
+        username: 'Current User',
+        participantId: 'user-1',
+        previewMessage: '',
+        unreadCount: 0,
+      ),
+      _conversation('channel-2', 'Bola Ige'),
+    ];
+
+    await _pumpSidebar(tester, list);
+
+    final tiles = tester
+        .widgetList<DmListTile>(find.byType(DmListTile))
+        .toList();
+    expect(tiles.first.conversation.channelId, 'channel-self');
+    expect(find.text('(you)'), findsOneWidget);
+    expect(find.text('Current User'), findsOneWidget);
+  });
+
+  testWidgets('search query matches self DM by "you"', (tester) async {
+    final list = [
+      _conversation('channel-1', 'Ada Okafor'),
+      DmConversation(
+        channelId: 'channel-self',
+        username: 'Current User',
+        participantId: 'user-1',
+        previewMessage: '',
+        unreadCount: 0,
+      ),
+      _conversation('channel-2', 'Bola Ige'),
+    ];
+
+    await _pumpSidebar(tester, list);
+
+    await tester.enterText(search, 'you');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(DmListTile), findsOneWidget);
+    expect(find.text('Current User'), findsOneWidget);
+    expect(find.text('(you)'), findsOneWidget);
   });
 }
