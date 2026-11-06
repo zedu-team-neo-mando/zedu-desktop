@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -67,11 +70,23 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
       return;
     }
 
-    await showEditProfileDialog(context, account, (updated) async {
-      await notifier.updateAccount(updated);
-      // updateAccount clears the error when it starts and sets it on failure.
-      return ref.read(userProfileNotifierProvider).error;
-    });
+    await showEditProfileDialog(
+      context,
+      account,
+      (updated) async {
+        await notifier.updateAccount(updated);
+        // updateAccount clears the error when it starts and sets it on failure.
+        return ref.read(userProfileNotifierProvider).error;
+      },
+      onUploadPhoto: (path) async {
+        await ref.read(userProfileNotifierProvider.notifier).uploadAvatar(path);
+        return ref.read(userProfileNotifierProvider).error;
+      },
+      onRemovePhoto: () async {
+        await ref.read(userProfileNotifierProvider.notifier).removeAvatar();
+        return ref.read(userProfileNotifierProvider).error;
+      },
+    );
   }
 
   Future<void> _handleMenuAction(String action) async {
@@ -80,9 +95,23 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
       case 'view_profile':
         await showDialog<void>(
           context: context,
-          builder: (context) => _ParticipantProfileDialog(
-            conversation: conversation,
-            handle: _recipientHandle,
+          builder: (context) => AlertDialog(
+            title: Text(conversation.displayName),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (conversation.participantEmail?.isNotEmpty == true)
+                  Text(conversation.participantEmail!),
+                Text('User ID: ${conversation.participantId}'),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
           ),
         );
       case 'mute_notifications':
@@ -101,6 +130,8 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
         await _showConversationSearch();
       case 'view_files':
         await _showConversationFiles();
+      case 'export_conversation':
+        await _exportConversation();
       case 'clear_history':
         final confirmed = await _confirmConversationAction(
           title: 'Clear history?',
@@ -116,6 +147,14 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
               .clearLocalHistory();
           _showActionNotice('History cleared on this device.');
         }
+      case 'report_user':
+        await reportContent(
+          context,
+          subject: 'Report: ${conversation.displayName}',
+          details:
+              'Reported user: ${conversation.displayName}\n'
+              'User ID: ${conversation.participantId}',
+        );
       case 'delete_conversation':
         final confirmed = await _confirmConversationAction(
           title: 'Delete conversation?',
@@ -169,23 +208,11 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
     final history = ref.read(
       chatHistoryProvider(widget.conversation.channelId),
     );
-    final messages = [
-      for (final message in history.messages)
-        _SearchableMessage(
-          text: _SearchableMessage.plainText(message['content']),
-          sender: history.isMyMessage(message)
-              ? history.currentUserName
-              : widget.conversation.displayName,
-          sentAt: DateTime.tryParse(
-            message['created_at']?.toString() ?? '',
-          )?.toLocal(),
-        ),
-    ].where((message) => message.text.isNotEmpty).toList();
     await showDialog<void>(
       context: context,
       builder: (context) => _ConversationSearchDialog(
         displayName: widget.conversation.displayName,
-        messages: messages,
+        messages: history.messages,
       ),
     );
   }
@@ -201,6 +228,73 @@ class _DmChatAreaState extends ConsumerState<DmChatArea> {
         history: history,
       ),
     );
+  }
+
+  /// Asks Text or PDF, loads the whole conversation, and saves its transcript
+  /// (timestamp and author on every message, oldest first) where the user
+  /// picks.
+  Future<void> _exportConversation() async {
+    final format = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Export conversation'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'txt'),
+            child: const Text('Text file (.txt)'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'pdf'),
+            child: const Text('PDF document (.pdf)'),
+          ),
+        ],
+      ),
+    );
+    if (format == null || !mounted) return;
+
+    final conversation = widget.conversation;
+    final history = ref.read(chatHistoryProvider(conversation.channelId));
+    try {
+      await history.loadAll();
+      if (!mounted) return;
+      final entries = buildTranscript(
+        messages: history.messages,
+        isMine: history.isMyMessage,
+        myName: history.currentUserName,
+        otherName: conversation.displayName,
+      );
+      final title = 'Conversation with ${conversation.displayName}';
+      final now = DateTime.now();
+      final Uint8List bytes;
+      if (format == 'pdf') {
+        final font = await rootBundle.load(
+          'assets/fonts/Roboto/Roboto-Regular.ttf',
+        );
+        bytes = await transcriptToPdf(
+          title: title,
+          entries: entries,
+          exportedAt: now,
+          font: font,
+        );
+      } else {
+        bytes = Uint8List.fromList(
+          utf8.encode(
+            transcriptToText(title: title, entries: entries, exportedAt: now),
+          ),
+        );
+      }
+      final path = await FilePicker.saveFile(
+        dialogTitle: 'Export conversation',
+        fileName: transcriptFileName(conversation.displayName, now, format),
+        type: FileType.custom,
+        allowedExtensions: [format],
+      );
+      if (path == null) return;
+      await File(path).writeAsBytes(bytes);
+      if (mounted) _showActionNotice('Conversation exported.');
+    } catch (_) {
+      if (mounted) _showActionNotice('Could not export the conversation.');
+    }
   }
 
   void _showActionNotice(String message) {
@@ -546,55 +640,9 @@ class _HistoryLoadError extends StatelessWidget {
   }
 }
 
-/// A loaded message as the conversation search shows it.
-class _SearchableMessage {
-  final String text;
-  final String sender;
-  final DateTime? sentAt;
-
-  const _SearchableMessage({
-    required this.text,
-    required this.sender,
-    this.sentAt,
-  });
-
-  /// Message content is HTML. Search and show what the person actually wrote,
-  /// so tag names never match and no tags appear in the results.
-  static String plainText(Object? content) => (content?.toString() ?? '')
-      .replaceAll(RegExp(r'</?(p|div|li|ul|ol|br|blockquote|pre)\b[^>]*>'), ' ')
-      .replaceAll(RegExp(r'<[^>]*>'), '')
-      .replaceAll('&nbsp;', ' ')
-      .replaceAll('&lt;', '<')
-      .replaceAll('&gt;', '>')
-      .replaceAll('&quot;', '"')
-      .replaceAll('&#39;', "'")
-      .replaceAll('&amp;', '&')
-      .replaceAll(RegExp(r'\s+'), ' ')
-      .trim();
-
-  /// "4:05 PM" for today, "Nov 3, 4:05 PM" for earlier days.
-  String? get sentAtLabel {
-    final at = sentAt;
-    if (at == null) return null;
-    final hour = at.hour > 12 ? at.hour - 12 : (at.hour == 0 ? 12 : at.hour);
-    final minute = at.minute.toString().padLeft(2, '0');
-    final period = at.hour >= 12 ? 'PM' : 'AM';
-    final time = '$hour:$minute $period';
-    final now = DateTime.now();
-    if (at.year == now.year && at.month == now.month && at.day == now.day) {
-      return time;
-    }
-    const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', //
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    return '${months[at.month - 1]} ${at.day}, $time';
-  }
-}
-
 class _ConversationSearchDialog extends StatefulWidget {
   final String displayName;
-  final List<_SearchableMessage> messages;
+  final List<Map<String, dynamic>> messages;
 
   const _ConversationSearchDialog({
     required this.displayName,
@@ -609,6 +657,20 @@ class _ConversationSearchDialog extends StatefulWidget {
 class _ConversationSearchDialogState extends State<_ConversationSearchDialog> {
   final _controller = TextEditingController();
 
+  /// Message content is HTML. Search and show what the person actually wrote,
+  /// so tag names never match and no tags appear in the results.
+  static String _plainText(Object? content) => (content?.toString() ?? '')
+      .replaceAll(RegExp(r'</?(p|div|li|ul|ol|br|blockquote|pre)\b[^>]*>'), ' ')
+      .replaceAll(RegExp(r'<[^>]*>'), '')
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .replaceAll('&amp;', '&')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+
   @override
   void dispose() {
     _controller.dispose();
@@ -617,19 +679,10 @@ class _ConversationSearchDialogState extends State<_ConversationSearchDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
-    final textTheme = context.textTheme;
-    final rawQuery = _controller.text.trim();
-    final query = rawQuery.toLowerCase();
-    final results = query.isEmpty
-        ? const <_SearchableMessage>[]
-        : widget.messages
-              .where((message) => message.text.toLowerCase().contains(query))
-              .toList();
-    final hintStyle = textTheme.bodyMedium?.copyWith(
-      color: colors.textSecondary,
-    );
-
+    final query = _controller.text.trim().toLowerCase();
+    final results = widget.messages
+        .map((message) => _plainText(message['content']))
+        .where((text) => text.toLowerCase().contains(query));
     return AlertDialog(
       title: Text('Search ${widget.displayName}'),
       content: SizedBox(
@@ -637,7 +690,6 @@ class _ConversationSearchDialogState extends State<_ConversationSearchDialog> {
         height: 360,
         child: Column(
           mainAxisSize: MainAxisSize.max,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             TextField(
               controller: _controller,
@@ -645,41 +697,18 @@ class _ConversationSearchDialogState extends State<_ConversationSearchDialog> {
               decoration: const InputDecoration(hintText: 'Search messages'),
               onChanged: (_) => setState(() {}),
             ),
-            const SizedBox(height: 6),
-            Text(
-              'Searches the messages loaded in this conversation.',
-              style: textTheme.bodySmall?.copyWith(color: colors.textHint),
-            ),
             const SizedBox(height: 12),
-            Expanded(
-              child: query.isEmpty
-                  ? Text('Enter a search term', style: hintStyle)
-                  : results.isEmpty
-                  ? Text('No messages match "$rawQuery"', style: hintStyle)
-                  : ListView.builder(
-                      itemCount: results.length,
-                      itemBuilder: (context, index) {
-                        final message = results[index];
-                        final sentAt = message.sentAtLabel;
-                        return ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            message.text,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Text(
-                            sentAt == null
-                                ? message.sender
-                                : '${message.sender} · $sentAt',
-                            style: textTheme.bodySmall?.copyWith(
-                              color: colors.textSecondary,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: query.isEmpty
+                    ? const [Text('Enter a search term')]
+                    : results
+                          .map(
+                            (text) => ListTile(dense: true, title: Text(text)),
+                          )
+                          .toList(),
+              ),
             ),
           ],
         ),
@@ -690,101 +719,6 @@ class _ConversationSearchDialogState extends State<_ConversationSearchDialog> {
           child: const Text('Close'),
         ),
       ],
-    );
-  }
-}
-
-/// The other person's profile, opened from the header's "View profile".
-class _ParticipantProfileDialog extends StatelessWidget {
-  final DmConversation conversation;
-  final String handle;
-
-  const _ParticipantProfileDialog({
-    required this.conversation,
-    required this.handle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final textTheme = context.textTheme;
-    final name = conversation.displayName.trim();
-    final avatarUrl = conversation.effectiveAvatarUrl;
-    final email = conversation.participantEmail?.trim() ?? '';
-
-    return Dialog(
-      backgroundColor: colors.background,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: SizedBox(
-        width: 360,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircleAvatar(
-                radius: 36,
-                backgroundColor: colors.primary,
-                backgroundImage: avatarUrl != null
-                    ? NetworkImage(avatarUrl)
-                    : null,
-                child: avatarUrl == null
-                    ? Text(
-                        avatarInitial(name),
-                        style: textTheme.headlineSmall?.copyWith(
-                          color: colors.onPrimary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      )
-                    : null,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                conversation.displayName,
-                textAlign: TextAlign.center,
-                style: textTheme.titleMedium?.copyWith(
-                  color: colors.textPrimary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                handle,
-                style: textTheme.bodyMedium?.copyWith(
-                  color: colors.textSecondary,
-                ),
-              ),
-              if (email.isNotEmpty) ...[
-                const SizedBox(height: 20),
-                Divider(height: 1, color: colors.divider),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Icon(Icons.mail_outline, size: 18, color: colors.textHint),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: SelectableText(
-                        email,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: colors.textPrimary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Close'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -839,19 +773,20 @@ class _DmChatHeader extends StatelessWidget {
           CircleAvatar(
             radius: 20,
             backgroundColor: colors.primary,
-            backgroundImage: conversation.effectiveAvatarUrl != null
+            foregroundImage: conversation.effectiveAvatarUrl != null
                 ? NetworkImage(conversation.effectiveAvatarUrl!)
                 : null,
-            child: conversation.effectiveAvatarUrl == null
-                ? Text(
-                    participantInitial,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  )
+            onForegroundImageError: conversation.effectiveAvatarUrl != null
+                ? ignoreAvatarError
                 : null,
+            child: Text(
+              participantInitial,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
+            ),
           ),
           const SizedBox(width: 12),
           if (isOwnSpace)
@@ -947,9 +882,12 @@ class _DmChatHeader extends StatelessWidget {
               menuItem('pinned_messages', 'Pinned messages'),
               menuItem('search_in_conversation', 'Search in conversation'),
               menuItem('view_files', 'View files'),
+              menuItem('export_conversation', 'Export conversation'),
               const PopupMenuDivider(height: 1),
               menuItem('clear_history', 'Clear history'),
-              menuItem('block_user', 'Block User'),
+              menuItem('report_user', 'Report ${conversation.displayName}'),
+              if (kUnfinishedFeaturesEnabled)
+                menuItem('block_user', 'Block User'),
               menuItem(
                 'delete_conversation',
                 'Delete conversation',
@@ -1116,20 +1054,22 @@ class _MessageBubble extends ConsumerWidget {
             CircleAvatar(
               radius: 15,
               backgroundColor: colors.primary,
-              backgroundImage:
+              foregroundImage:
                   senderAvatarUrl != null && senderAvatarUrl.isNotEmpty
                   ? NetworkImage(senderAvatarUrl)
                   : null,
-              child: senderAvatarUrl == null || senderAvatarUrl.isEmpty
-                  ? Text(
-                      senderInitial,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                      ),
-                    )
+              onForegroundImageError:
+                  senderAvatarUrl != null && senderAvatarUrl.isNotEmpty
+                  ? ignoreAvatarError
                   : null,
+              child: Text(
+                senderInitial,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
             ),
             const SizedBox(width: 12),
           ],
@@ -1165,6 +1105,13 @@ class _MessageBubble extends ConsumerWidget {
                     enabled: isMe && status == null,
                     onEdit: () => onEdit(messageId, content),
                     onDelete: () => _confirmDelete(context, ref, messageId),
+                    onReport: isMe
+                        ? null
+                        : () => reportContent(
+                            context,
+                            subject: 'Report: message from $senderName',
+                            details: 'Message from $senderName:\n"$content"',
+                          ),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -1396,12 +1343,16 @@ class _OwnMessageMenu extends StatefulWidget {
     required this.enabled,
     required this.onEdit,
     required this.onDelete,
+    this.onReport,
     required this.child,
   });
 
   final bool enabled;
   final VoidCallback? onEdit;
   final VoidCallback onDelete;
+
+  /// Shown instead of Edit and Delete on other people's messages.
+  final VoidCallback? onReport;
   final Widget child;
 
   @override
@@ -1414,7 +1365,8 @@ class _OwnMessageMenuState extends State<_OwnMessageMenu> {
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.enabled) return widget.child;
+    final canReport = !widget.enabled && widget.onReport != null;
+    if (!widget.enabled && !canReport) return widget.child;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -1431,19 +1383,29 @@ class _OwnMessageMenuState extends State<_OwnMessageMenu> {
                 key: _menuKey,
                 tooltip: 'Message actions',
                 icon: const Icon(Icons.more_horiz, size: 18),
-                onSelected: (value) =>
-                    value == 'edit' ? widget.onEdit?.call() : widget.onDelete(),
-                itemBuilder: (_) => [
-                  if (widget.onEdit != null)
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Text('Edit message'),
-                    ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Text('Delete message'),
-                  ),
-                ],
+                onSelected: (value) => switch (value) {
+                  'edit' => widget.onEdit?.call(),
+                  'report' => widget.onReport?.call(),
+                  _ => widget.onDelete(),
+                },
+                itemBuilder: (_) => canReport
+                    ? const [
+                        PopupMenuItem(
+                          value: 'report',
+                          child: Text('Report message'),
+                        ),
+                      ]
+                    : [
+                        if (widget.onEdit != null)
+                          const PopupMenuItem(
+                            value: 'edit',
+                            child: Text('Edit message'),
+                          ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Text('Delete message'),
+                        ),
+                      ],
               ),
             ),
             Flexible(child: widget.child),

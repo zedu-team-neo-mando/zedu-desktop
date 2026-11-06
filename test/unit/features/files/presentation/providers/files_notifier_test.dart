@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:zedu/core/core.dart';
@@ -12,6 +13,28 @@ const _drafts = FileFolder(id: 'drafts', name: 'drafts');
 /// path, split on the platform's separator, so the path must use it.
 XFile _file(String name) =>
     XFile('${Directory.systemTemp.path}${Platform.pathSeparator}$name');
+
+/// The open workspace, switchable mid-test.
+class _Org extends Notifier<String> {
+  @override
+  String build() => 'org-a';
+
+  void select(String id) => state = id;
+}
+
+final _orgProvider = NotifierProvider<_Org, String>(_Org.new);
+
+/// Creates folders when [done] completes.
+class _SlowFolderRepository extends _UploadRepository {
+  final done = Completer<Result<void>>();
+
+  @override
+  Future<Result<void>> createFolder({
+    required String name,
+    required String orgId,
+    String? parentId,
+  }) => done.future;
+}
 
 void main() {
   late ProviderContainer container;
@@ -118,11 +141,80 @@ void main() {
       expect(state.folderPath, isEmpty);
       expect(state.tab, FilesTab.files);
     });
+
+    test('an upload from Shared with me shows it in All files', () async {
+      uploads.read(filesProvider.notifier).selectView(FilesScope.shared);
+
+      await uploads.read(filesActionsProvider.notifier).uploadFiles([
+        _file('a.png'),
+      ]);
+
+      expect(uploads.read(filesProvider).view, FilesScope.all);
+    });
+
+    test('an upload from My files stays in My files', () async {
+      uploads.read(filesProvider.notifier).selectView(FilesScope.mine);
+
+      await uploads.read(filesActionsProvider.notifier).uploadFiles([
+        _file('a.png'),
+      ]);
+
+      expect(uploads.read(filesProvider).view, FilesScope.mine);
+    });
+  });
+
+  group('createFolder', () {
+    late ProviderContainer container;
+    late _SlowFolderRepository repository;
+
+    setUp(() {
+      repository = _SlowFolderRepository();
+      container = ProviderContainer(
+        overrides: [
+          currentOrgIdProvider.overrideWith((ref) => ref.watch(_orgProvider)),
+          filesRepositoryProvider.overrideWithValue(repository),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.read(filesProvider.notifier).setTab(FilesTab.files);
+    });
+
+    test(
+      'a result that lands after a workspace switch changes nothing',
+      () async {
+        final pending = container
+            .read(filesActionsProvider.notifier)
+            .createFolder('Plans');
+        expect(container.read(filesActionsProvider).isCreatingFolder, isTrue);
+
+        container.read(_orgProvider.notifier).select('org-b');
+        container.read(filesProvider.notifier).setTab(FilesTab.files);
+        repository.done.complete(const Success(null));
+
+        expect(await pending, isNull);
+        expect(container.read(filesProvider).tab, FilesTab.files);
+        expect(container.read(filesActionsProvider).isCreatingFolder, isFalse);
+      },
+    );
+
+    test('a result in the same workspace shows the folders', () async {
+      final pending = container
+          .read(filesActionsProvider.notifier)
+          .createFolder('Plans');
+      repository.done.complete(const Success(null));
+
+      expect(await pending, isNull);
+      expect(container.read(filesProvider).tab, FilesTab.folders);
+    });
   });
 }
 
 class _UploadRepository implements FilesRepository {
   final uploaded = <String>[];
+
+  @override
+  Future<Result<WorkspaceFileInfo>> fetchFileInfo(String fileId) async =>
+      Success(WorkspaceFileInfo());
 
   @override
   Future<Result<WorkspaceFile>> uploadFile(XFile file) async {
@@ -149,57 +241,4 @@ class _UploadRepository implements FilesRepository {
     required String orgId,
     String? parentId,
   }) async => const Success(null);
-
-  @override
-  Future<Result<void>> downloadFile({
-    required WorkspaceFile file,
-    required String savePath,
-    void Function(double? progress)? onProgress,
-  }) async => const Success(null);
-
-  @override
-  Future<Result<void>> deleteFile(
-    String fileId, {
-    bool permanent = false,
-  }) async => const Success(null);
-
-  @override
-  Future<Result<void>> renameFile(String fileId, String name) async =>
-      const Success(null);
-
-  @override
-  Future<Result<void>> moveFile(String fileId, String folderId) async =>
-      const Success(null);
-
-  @override
-  Future<Result<FileShareResult>> shareFile({
-    required String fileId,
-    required List<String> recipientIds,
-    required FileSharePermission permission,
-    required FileShareAccess access,
-    String note = '',
-  }) async => const Success(FileShareResult());
-
-  @override
-  Future<Result<Uint8List>> fetchFilePreview(
-    WorkspaceFile file,
-    FilePreviewKind kind,
-  ) async => Success(Uint8List(0));
-
-  @override
-  Future<Result<WorkspaceFile>> fetchFileDetails(String fileId) async =>
-      Success(WorkspaceFile(id: fileId, name: fileId));
-
-  @override
-  Future<Result<WorkspaceFileInfo>> fetchFileInfo(String fileId) async =>
-      Success(WorkspaceFileInfo());
-
-  @override
-  Future<Result<Set<String>>> fetchPinnedFileIds() async => const Success({});
-
-  @override
-  Future<Result<void>> pinFile(String fileId) async => const Success(null);
-
-  @override
-  Future<Result<void>> unpinFile(String fileId) async => const Success(null);
 }

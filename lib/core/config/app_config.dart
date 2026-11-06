@@ -15,6 +15,31 @@ const String kDefaultDesktopGoogleClientId =
 /// The website's Contact Sales page, opened from the Enterprise plan.
 const String kDefaultContactSalesUrl = 'https://zedu.chat/contact-sales';
 
+/// Microsoft Store builds pass `--dart-define=STORE_BUILD=true`. Store
+/// certification fails a product for any control that does nothing or only
+/// says "not available yet", so these builds hide unfinished features.
+const bool kStoreBuild = bool.fromEnvironment('STORE_BUILD');
+
+/// Whether login and sign-up show the Google and Apple buttons. Off in Store
+/// builds while the desktop Google code exchange with the backend fails
+/// (`unauthorized_client`); `SOCIAL_SIGN_IN` overrides it either way.
+const bool kSocialSignInEnabled = bool.fromEnvironment(
+  'SOCIAL_SIGN_IN',
+  defaultValue: !kStoreBuild,
+);
+
+/// Whether features that are not wired to the backend yet show up: local-only
+/// group chats (fed by a mock socket), Block User and screen sharing.
+const bool kUnfinishedFeaturesEnabled = !kStoreBuild;
+
+/// Where in-app reports of messages and people go, until the backend has a
+/// report endpoint.
+const String kReportEmail = 'support@emerj.net';
+
+/// Terms of service and privacy policy, linked from sign-up and Settings.
+const String kTermsUrl = 'https://zedu.chat/terms-of-service';
+const String kPrivacyUrl = 'https://zedu.chat/policy';
+
 class AppConfig {
   const AppConfig({
     required this.apiBaseUrl,
@@ -22,7 +47,6 @@ class AppConfig {
     this.googleClientId = kDefaultDesktopGoogleClientId,
     this.googleClientSecret = '',
     this.contactSalesUrl = kDefaultContactSalesUrl,
-    this.webAppUrl = '',
   });
 
   /// Resolves config after [loadAppEnv] has run in [main] (root `.env` /
@@ -35,13 +59,11 @@ class AppConfig {
     const defineUsesMock = String.fromEnvironment('USE_MOCK_DATA');
     const defineClientId = String.fromEnvironment('GOOGLE_CLIENT_ID');
     const defineClientSecret = String.fromEnvironment('GOOGLE_CLIENT_SECRET');
-    const defineWebAppUrl = String.fromEnvironment('WEB_APP_URL');
 
     final envApiBaseUrl = dotenv.maybeGet('API_BASE_URL')?.trim();
     final envUsesMock = dotenv.maybeGet('USE_MOCK_DATA')?.trim();
     final envClientId = dotenv.maybeGet('GOOGLE_CLIENT_ID')?.trim();
     final envClientSecret = dotenv.maybeGet('GOOGLE_CLIENT_SECRET')?.trim();
-    final envWebAppUrl = dotenv.maybeGet('WEB_APP_URL')?.trim();
 
     // Teams point the app at their own backend via --dart-define or .env; Zedu staging is the default.
     String apiBaseUrl = defineApiBaseUrl.isNotEmpty
@@ -79,9 +101,6 @@ class AppConfig {
       usesMockData: usesMockData,
       googleClientId: googleClientId,
       googleClientSecret: googleClientSecret,
-      webAppUrl: defineWebAppUrl.isNotEmpty
-          ? defineWebAppUrl
-          : envWebAppUrl ?? '',
     );
   }
 
@@ -90,31 +109,6 @@ class AppConfig {
   final String googleClientId;
   final String googleClientSecret;
   final String contactSalesUrl;
-
-  /// The web app's address, from `WEB_APP_URL`. Empty means [webBaseUrl]
-  /// works it out from [apiBaseUrl].
-  final String webAppUrl;
-
-  /// Where the web app runs, without a trailing slash, for links that open
-  /// in the browser (such as Buzz meetings). Defaults to the API host
-  /// without its `api.` prefix: `https://api.zedu.chat/api/v1/` gives
-  /// `https://zedu.chat`.
-  String get webBaseUrl {
-    final configured = webAppUrl.replaceAll('"', '').replaceAll("'", '').trim();
-    if (configured.isNotEmpty) {
-      return configured.endsWith('/')
-          ? configured.substring(0, configured.length - 1)
-          : configured;
-    }
-    final api = Uri.tryParse(apiBaseUrl);
-    if (api == null || api.host.isEmpty) return 'https://zedu.chat';
-    final host = api.host.startsWith('api.') ? api.host.substring(4) : api.host;
-    return Uri(
-      scheme: api.scheme.isEmpty ? 'https' : api.scheme,
-      host: host,
-      port: api.hasPort ? api.port : null,
-    ).toString();
-  }
 }
 
 bool _parseBool(String raw, {required bool defaultValue}) {
