@@ -300,11 +300,7 @@ void main() {
       expect(c.read(notificationSettingsProvider).isDndActive, isTrue);
 
       // Unmute button resumes notifications and cancels the timer
-      await _tapAndExpectToast(
-        t,
-        find.text('Unmute'),
-        'Notifications resumed',
-      );
+      await _tapAndExpectToast(t, find.text('Unmute'), 'Notifications resumed');
       expect(c.read(notificationSettingsProvider).isDndActive, isFalse);
 
       // Hide button toggles presence away
