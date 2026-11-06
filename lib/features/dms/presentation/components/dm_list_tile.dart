@@ -107,19 +107,20 @@ class DmListTile extends ConsumerWidget {
         CircleAvatar(
           radius: 18,
           backgroundColor: colors.primary,
-          backgroundImage: conversation.effectiveAvatarUrl != null
+          foregroundImage: conversation.effectiveAvatarUrl != null
               ? NetworkImage(conversation.effectiveAvatarUrl!)
               : null,
-          child: conversation.effectiveAvatarUrl == null
-              ? Text(
-                  avatarInitial(conversation.displayName),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                )
+          onForegroundImageError: conversation.effectiveAvatarUrl != null
+              ? ignoreAvatarError
               : null,
+          child: Text(
+            avatarInitial(conversation.displayName),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -177,7 +178,7 @@ class DmListTile extends ConsumerWidget {
                 )
               else
                 Text(
-                  conversation.previewMessage,
+                  previewText(conversation.previewMessage),
                   style: TextStyle(
                     color: hasUnread
                         ? colors.onPrimary
@@ -229,4 +230,19 @@ class DmListTile extends ConsumerWidget {
       ],
     );
   }
+
+  /// A message sent from Zedu web arrives as HTML, so the preview shows the
+  /// words, not `<p>hello</p>`.
+  @visibleForTesting
+  static String previewText(String message) => message
+      .replaceAll(RegExp(r'</?(p|div|li|ul|ol|br|blockquote|pre)\b[^>]*>'), ' ')
+      .replaceAll(RegExp(r'<[^>]*>'), '')
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .replaceAll('&amp;', '&')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
 }

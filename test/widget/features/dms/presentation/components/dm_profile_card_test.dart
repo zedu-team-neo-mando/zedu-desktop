@@ -86,15 +86,15 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.byType(Dialog), findsNothing);
+    expect(find.byType(AlertDialog), findsNothing);
 
     await tester.tap(find.text('View Profile'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(Dialog), findsOneWidget);
+    expect(find.byType(AlertDialog), findsOneWidget);
     expect(
       find.descendant(
-        of: find.byType(Dialog),
+        of: find.byType(AlertDialog),
         matching: find.text('Card Tester'),
       ),
       findsOneWidget,

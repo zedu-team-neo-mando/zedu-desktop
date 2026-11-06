@@ -101,6 +101,7 @@ class _ProfileContent extends StatelessWidget {
               onDelete: notifier.deleteAccount,
             ),
             UserProfileSection.notifications => const SizedBox.shrink(),
+            UserProfileSection.shortcuts => const ShortcutsSection(),
             UserProfileSection.security => SecuritySection(
               sessions: state.securitySessions,
               isSaving: state.isSaving,
@@ -128,6 +129,7 @@ class _ProfileContent extends StatelessWidget {
             ),
             UserProfileSection.rolesAndPermissions =>
               RolesAndPermissionsSection(roles: state.rolesAndPermissions),
+            UserProfileSection.webhooks => const WebhooksSection(),
             UserProfileSection.billing => BillingSection(
               billing: state.billing ?? BillingInfo.empty(),
               onInvite: notifier.inviteMember,

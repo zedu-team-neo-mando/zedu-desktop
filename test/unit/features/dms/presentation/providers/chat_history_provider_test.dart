@@ -249,8 +249,9 @@ void main() {
       ).thenAnswer((_) async {});
 
       notifier.startEditing('m1');
-      await notifier.saveEdit('m1', 'edited');
+      final saved = await notifier.saveEdit('m1', 'edited');
 
+      expect(saved, isTrue);
       expect(notifier.editingMessageId, isNull);
       expect(notifier.messages.single['content'], 'edited');
     });
@@ -267,8 +268,9 @@ void main() {
         ).thenThrow(Exception('network error'));
 
         notifier.startEditing('m1');
-        await notifier.saveEdit('m1', 'edited');
+        final saved = await notifier.saveEdit('m1', 'edited');
 
+        expect(saved, isFalse);
         expect(notifier.editingMessageId, isNull);
         expect(notifier.messages.single['content'], 'hello');
       },
@@ -727,10 +729,13 @@ void _retryTests() {
       sub.close();
       await pumpEventQueue();
 
+      // Disposed: a ChangeNotifier refuses new listeners once disposed.
       expect(
-        () => autoNotifier.notifyListeners(),
+        () => autoNotifier.addListener(() {}),
         throwsA(isA<FlutterError>()),
       );
+      // Work still finishing after dispose must not crash (#2633).
+      expect(() => autoNotifier.notifyListeners(), returnsNormally);
     });
   });
 }
