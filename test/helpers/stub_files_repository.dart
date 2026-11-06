@@ -84,5 +84,6 @@ class StubFilesRepository implements FilesRepository {
   Future<Result<void>> unpinFile(String fileId) => _unimplemented('unpinFile');
 
   @override
-  Future<Result<void>> deleteFolder(String id) => _unimplemented('deleteFolder');
+  Future<Result<void>> deleteFolder(String id) =>
+      _unimplemented('deleteFolder');
 }
