@@ -57,6 +57,16 @@ void main() {
       await tester.pump();
     }
 
+    testWidgets('Remember me checkbox aligns with the form fields left edge', (
+      tester,
+    ) async {
+      await pumpDesktopLogin(tester, FakeAuthNotifier());
+
+      final checkboxLeft = tester.getTopLeft(find.byType(Checkbox)).dx;
+      final fieldLeft = tester.getTopLeft(find.byType(AppTextField).first).dx;
+      expect(checkboxLeft, fieldLeft);
+    });
+
     for (final invalidEmail in ['', 'invalid-email']) {
       testWidgets('Enter validates email "$invalidEmail" without logging in', (
         tester,

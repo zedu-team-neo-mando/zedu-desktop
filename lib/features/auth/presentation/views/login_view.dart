@@ -210,6 +210,11 @@ class _LoginViewState extends ConsumerState<LoginView> {
                             children: [
                               Checkbox(
                                 value: _rememberMe,
+                                // Shrink the tap target so the box itself
+                                // aligns with the fields' left edge above.
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
                                 onChanged: (value) {
                                   setState(() {
                                     _rememberMe = value ?? false;
