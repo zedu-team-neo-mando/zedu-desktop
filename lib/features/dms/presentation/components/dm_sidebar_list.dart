@@ -106,6 +106,10 @@ class _DmSidebarListState extends ConsumerState<DmSidebarList> {
                   ),
                   data: (conversations) {
                     final actions = ref.watch(dmConversationActionsProvider);
+                    final currentUserId = ref
+                        .watch(authNotifierProvider)
+                        .user
+                        ?.id;
                     final visibleConversations =
                         conversations
                             .where(
@@ -115,6 +119,16 @@ class _DmSidebarListState extends ConsumerState<DmSidebarList> {
                             )
                             .toList()
                           ..sort((a, b) {
+                            final aSelf =
+                                currentUserId != null &&
+                                currentUserId.isNotEmpty &&
+                                a.participantId == currentUserId;
+                            final bSelf =
+                                currentUserId != null &&
+                                currentUserId.isNotEmpty &&
+                                b.participantId == currentUserId;
+                            if (aSelf != bSelf) return aSelf ? -1 : 1;
+
                             final aPinned = actions.pinnedIds.contains(
                               a.channelId,
                             );
@@ -125,11 +139,19 @@ class _DmSidebarListState extends ConsumerState<DmSidebarList> {
                             return b.lastActivityAt.compareTo(a.lastActivityAt);
                           });
                     if (query.isNotEmpty) {
-                      visibleConversations.retainWhere(
-                        (conversation) => conversation.displayName
+                      visibleConversations.retainWhere((conversation) {
+                        final isSelf =
+                            currentUserId != null &&
+                            currentUserId.isNotEmpty &&
+                            conversation.participantId == currentUserId;
+                        final matchName = conversation.displayName
                             .toLowerCase()
-                            .contains(query),
-                      );
+                            .contains(query);
+                        final matchYou =
+                            isSelf &&
+                            ('you'.contains(query) || '(you)'.contains(query));
+                        return matchName || matchYou;
+                      });
                     }
                     if (visibleConversations.isEmpty) {
                       return Center(
