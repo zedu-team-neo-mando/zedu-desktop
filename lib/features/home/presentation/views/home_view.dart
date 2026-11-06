@@ -148,6 +148,9 @@ class _ChatAreaSwitcher extends ConsumerWidget {
         return const DmEmptyState();
       }
     }
+    if (state == HomeSidebarType.later) {
+      return const LaterView();
+    }
     return const HomeChatArea();
   }
 }

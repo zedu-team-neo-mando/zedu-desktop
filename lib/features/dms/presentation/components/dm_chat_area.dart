@@ -892,6 +892,36 @@ class _MessageBubble extends ConsumerWidget {
 
     final List<dynamic> media = (message['media'] as List<dynamic>?) ?? [];
 
+    final plainText = content
+        .replaceAll(RegExp(r'<[^>]*>'), '')
+        .replaceAll(RegExp(r'[*_~`]'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    final snippet = plainText.length > 120
+        ? '${plainText.substring(0, 120)}…'
+        : plainText;
+
+    void saveForLater() {
+      ref
+          .read(savedMessagesProvider.notifier)
+          .save(
+            SavedMessage(
+              messageId: messageId,
+              orgId: ref.read(currentOrgIdProvider),
+              conversationId: conversation.channelId,
+              conversationName: conversation.displayName,
+              senderName: senderName,
+              snippet: snippet.isEmpty ? 'Attachment' : snippet,
+              savedAt: DateTime.now(),
+            ),
+          );
+      AppToastService.show(
+        context,
+        type: AppToastType.success,
+        message: 'Saved for later',
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -949,10 +979,13 @@ class _MessageBubble extends ConsumerWidget {
                   ),
                 ),
                 if (content.isNotEmpty)
-                  _OwnMessageMenu(
-                    enabled: isMe && status == null,
-                    onEdit: () => onEdit(messageId, rawContent),
-                    onDelete: () => _confirmDelete(context, ref, messageId),
+                  _MessageMenu(
+                    enabled: status == null,
+                    onEdit: isMe ? () => onEdit(messageId, rawContent) : null,
+                    onDelete: isMe
+                        ? () => _confirmDelete(context, ref, messageId)
+                        : null,
+                    onSaveLater: () => saveForLater(),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -981,12 +1014,14 @@ class _MessageBubble extends ConsumerWidget {
                     child: content.isNotEmpty
                         ? _AttachmentBubbleList(media: media, isMe: isMe)
                         // No text to hang the menu on, so it goes on the
-                        // attachments (Delete only: there is nothing to edit).
-                        : _OwnMessageMenu(
-                            enabled: isMe && status == null,
+                        // attachments (Edit only applies to text).
+                        : _MessageMenu(
+                            enabled: status == null,
                             onEdit: null,
-                            onDelete: () =>
-                                _confirmDelete(context, ref, messageId),
+                            onDelete: isMe
+                                ? () => _confirmDelete(context, ref, messageId)
+                                : null,
+                            onSaveLater: () => saveForLater(),
                             child: _AttachmentBubbleList(
                               media: media,
                               isMe: isMe,
@@ -1169,26 +1204,28 @@ class _AttachmentBubbleList extends StatelessWidget {
 }
 
 /// Shows a "more" button on hover, and a right-click or long-press menu, for
-/// your own messages, with Edit and Delete. The long press is for touch input,
-/// where there is no hover or right click.
-class _OwnMessageMenu extends StatefulWidget {
-  const _OwnMessageMenu({
+/// a message: Save for later, plus Edit and Delete for your own messages.
+/// The long press is for touch input, where there is no hover or right click.
+class _MessageMenu extends StatefulWidget {
+  const _MessageMenu({
     required this.enabled,
     required this.onEdit,
     required this.onDelete,
+    required this.onSaveLater,
     required this.child,
   });
 
   final bool enabled;
   final VoidCallback? onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback? onDelete;
+  final VoidCallback? onSaveLater;
   final Widget child;
 
   @override
-  State<_OwnMessageMenu> createState() => _OwnMessageMenuState();
+  State<_MessageMenu> createState() => _MessageMenuState();
 }
 
-class _OwnMessageMenuState extends State<_OwnMessageMenu> {
+class _MessageMenuState extends State<_MessageMenu> {
   final _menuKey = GlobalKey<PopupMenuButtonState<String>>();
   bool _hovered = false;
 
@@ -1211,18 +1248,28 @@ class _OwnMessageMenuState extends State<_OwnMessageMenu> {
                 key: _menuKey,
                 tooltip: 'Message actions',
                 icon: const Icon(Icons.more_horiz, size: 18),
-                onSelected: (value) =>
-                    value == 'edit' ? widget.onEdit?.call() : widget.onDelete(),
+                onSelected: (value) => switch (value) {
+                  'edit' => widget.onEdit?.call(),
+                  'delete' => widget.onDelete?.call(),
+                  'save_later' => widget.onSaveLater?.call(),
+                  _ => null,
+                },
                 itemBuilder: (_) => [
+                  if (widget.onSaveLater != null)
+                    const PopupMenuItem(
+                      value: 'save_later',
+                      child: Text('Save for later'),
+                    ),
                   if (widget.onEdit != null)
                     const PopupMenuItem(
                       value: 'edit',
                       child: Text('Edit message'),
                     ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Text('Delete message'),
-                  ),
+                  if (widget.onDelete != null)
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Text('Delete message'),
+                    ),
                 ],
               ),
             ),

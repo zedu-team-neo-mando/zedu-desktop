@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:riverpod/misc.dart' show Override;
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 import '../../../../../helpers/helpers.dart';
@@ -160,8 +161,9 @@ void main() {
   group('DmChatArea message text', () {
     Future<void> pumpChat(
       WidgetTester tester,
-      List<Map<String, dynamic>> messages,
-    ) async {
+      List<Map<String, dynamic>> messages, {
+      List<Override> overrides = const [],
+    }) async {
       tester.view.physicalSize = const Size(1200, 900);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -182,6 +184,7 @@ void main() {
             dmDraftStoreProvider.overrideWith(
               (ref) => DmDraftStore(storage, userId: 'user-1', orgId: 'org-1'),
             ),
+            ...overrides,
           ],
           child: buildTestMaterialApp(
             Scaffold(
@@ -223,6 +226,52 @@ void main() {
 
       expect(find.text('Edit message'), findsOneWidget);
       expect(find.text('Delete message'), findsOneWidget);
+    });
+
+    testWidgets('long press on someone else\'s message offers only Save for '
+        'later', (tester) async {
+      await pumpChat(tester, [message('m1', 'hello there')]);
+
+      await tester.longPress(find.text('hello there', findRichText: true));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Save for later'), findsOneWidget);
+      expect(find.text('Edit message'), findsNothing);
+      expect(find.text('Delete message'), findsNothing);
+    });
+
+    testWidgets('Save for later bookmarks the message and shows a toast', (
+      tester,
+    ) async {
+      final storage = FakeSavedMessagesStorage();
+      await pumpChat(
+        tester,
+        [message('m1', '<p>hello there</p>')],
+        overrides: [
+          currentOrgIdProvider.overrideWithValue('org-1'),
+          savedMessagesProvider.overrideWith(
+            () => SavedMessagesNotifier(storage),
+          ),
+        ],
+      );
+
+      await tester.longPress(find.text('hello there', findRichText: true));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Save for later'));
+      await tester.pumpAndSettle();
+
+      final saved = storage.saved['org-1']!;
+      expect(saved, hasLength(1));
+      expect(saved.single.messageId, 'm1');
+      expect(saved.single.conversationId, 'ch-1');
+      expect(saved.single.conversationName, 'Ada Lovelace');
+      expect(saved.single.senderName, 'Ada Lovelace');
+      expect(saved.single.snippet, 'hello there');
+      expect(find.text('Saved for later'), findsOneWidget);
+
+      // Let the toast's auto-dismiss timer run so none stays pending.
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pump(const Duration(milliseconds: 400));
     });
 
     testWidgets('Edit message from the menu puts the message in the composer', (
