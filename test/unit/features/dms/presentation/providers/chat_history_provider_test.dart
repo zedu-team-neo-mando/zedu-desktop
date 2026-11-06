@@ -187,7 +187,8 @@ void main() {
         // The user leaves before the first page has painted, so the teardown
         // runs while the request is still outstanding.
         sub.close();
-        await pumpEventQueue();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 1));
 
         firstPage.complete(history('arrived after the leave'));
         await tester.pump();
