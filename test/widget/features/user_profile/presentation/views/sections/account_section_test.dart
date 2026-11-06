@@ -1,3 +1,4 @@
+import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
 import '../../../../../../helpers/helpers.dart';
@@ -101,5 +102,36 @@ void main() {
     await _pump(tester, account.copyWith(username: '   '));
 
     expect(find.text('@adalovelace'), findsOneWidget);
+  });
+
+  testWidgets('binds handle text color to context.colors.textSecondary', (
+    tester,
+  ) async {
+    BuildContext? sectionContext;
+    await tester.pumpWidget(
+      buildTestMaterialApp(
+        Builder(
+          builder: (context) {
+            sectionContext = context;
+            return Scaffold(
+              body: SingleChildScrollView(
+                child: AccountSection(
+                  account: account.copyWith(username: 'CountessAda'),
+                  isSaving: false,
+                  onSave: (_) {},
+                  onDelete: () async {},
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+
+    final handleText = tester.widget<Text>(find.text('@CountessAda'));
+    expect(
+      handleText.style?.color,
+      equals(sectionContext!.colors.textSecondary),
+    );
   });
 }

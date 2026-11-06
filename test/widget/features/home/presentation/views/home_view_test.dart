@@ -3,13 +3,22 @@ import 'package:zedu/features/features.dart';
 
 import '../../../../../helpers/helpers.dart';
 
-Channel _channel(String name) => Channel(
+Channel _channel(String name, {String? topic}) => Channel(
   id: 'channel-$name',
   name: name,
   description: '',
   organisationId: 'org-1',
   ownerId: 'user-1',
+  topic: topic,
 );
+
+class _TopicChannelNotifier extends ChannelNotifier {
+  @override
+  Future<List<Channel>> build() async => [
+    _channel('general', topic: 'Release planning'),
+    _channel('random'),
+  ];
+}
 
 class _EmptyChannelRepository extends Mock implements ChannelRepository {
   @override
@@ -141,6 +150,19 @@ void main() {
       expect(find.text('Welcome to #general'), findsOneWidget);
     });
 
+    testWidgets('shows the channel topic in the header when set (#2852)', (
+      tester,
+    ) async {
+      await pumpSidebarAndChat(tester, channels: _TopicChannelNotifier.new);
+
+      expect(find.text('Release planning'), findsOneWidget);
+
+      await tester.tap(find.text('random'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('channel_header_topic')), findsNothing);
+    });
+
     testWidgets('clicking a sidebar channel opens it in the chat area', (
       tester,
     ) async {
@@ -264,7 +286,12 @@ void main() {
       tester,
     ) async {
       final repository = _LeavingChannelRepository(
-        const Failure(ApiFailure(message: 'You cannot leave this channel')),
+        const Failure(
+          ApiFailure(
+            message: 'You cannot leave this channel',
+            kind: ApiFailureKind.client,
+          ),
+        ),
       );
       await pumpSidebarAndChat(tester, repository: repository);
 
@@ -277,6 +304,40 @@ void main() {
       expect(find.text('# random'), findsOneWidget);
       await tester.pump(const Duration(seconds: 5));
     });
+
+    for (final (kind, expected) in [
+      (
+        ApiFailureKind.network,
+        'No internet connection. Check your network and try again.',
+      ),
+      (
+        ApiFailureKind.server,
+        'Something went wrong on our end. Please try again later.',
+      ),
+      (ApiFailureKind.unknown, 'Could not leave #random. Please try again.'),
+      (ApiFailureKind.parsing, 'Could not leave #random. Please try again.'),
+    ]) {
+      testWidgets('leave failure $kind shows safe copy and keeps the channel', (
+        tester,
+      ) async {
+        final repository = _LeavingChannelRepository(
+          Failure(
+            ApiFailure(
+              message: '<html>internal-host failure</html>',
+              kind: kind,
+            ),
+          ),
+        );
+        await pumpSidebarAndChat(tester, repository: repository);
+        await leaveRandom(tester);
+        await tester.tap(find.widgetWithText(TextButton, 'Leave'));
+        await tester.pumpAndSettle();
+        expect(find.text(expected), findsOneWidget);
+        expect(find.textContaining('internal-host'), findsNothing);
+        expect(find.text('# random'), findsOneWidget);
+        await tester.pump(const Duration(seconds: 5));
+      });
+    }
   });
 
   group('ResizableSidebar', () {
@@ -330,6 +391,63 @@ void main() {
           tester.getSize(resizableSidebar).width,
           greaterThanOrEqualTo(ResizableSidebar.defaultMinWidth),
         );
+      },
+    );
+
+    testWidgets(
+      'reclamps width when minWidth or maxWidth changes in didUpdateWidget',
+      (tester) async {
+        await tester.pumpWidget(
+          buildTestMaterialApp(
+            const Scaffold(
+              body: ResizableSidebar(
+                initialWidth: 350,
+                minWidth: 200,
+                maxWidth: 400,
+                child: Text('Sidebar'),
+              ),
+            ),
+          ),
+        );
+
+        final resizableSidebar = find.byKey(
+          const ValueKey('resizable-sidebar'),
+        );
+        expect(tester.getSize(resizableSidebar).width, 350);
+
+        // Update widget with lower maxWidth: 300
+        await tester.pumpWidget(
+          buildTestMaterialApp(
+            const Scaffold(
+              body: ResizableSidebar(
+                initialWidth: 350,
+                minWidth: 200,
+                maxWidth: 300,
+                child: Text('Sidebar'),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(tester.getSize(resizableSidebar).width, 300);
+
+        // Update widget with higher minWidth: 320
+        await tester.pumpWidget(
+          buildTestMaterialApp(
+            const Scaffold(
+              body: ResizableSidebar(
+                initialWidth: 350,
+                minWidth: 320,
+                maxWidth: 400,
+                child: Text('Sidebar'),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        expect(tester.getSize(resizableSidebar).width, 320);
       },
     );
   });

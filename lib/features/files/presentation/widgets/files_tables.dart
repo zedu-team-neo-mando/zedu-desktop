@@ -39,9 +39,17 @@ String formatFileSize(int bytes) {
     size /= 1024;
     unit++;
   }
-  final text = size >= 10 || size == size.roundToDouble()
-      ? size.round().toString()
-      : size.toStringAsFixed(1);
+  // Round to one decimal, then step up a unit when that rounds to a whole
+  // 1024, so 1023.9 KB reads 1 MB instead of an impossible 1024 KB.
+  var one = (size * 10).round() / 10;
+  while (one.round() >= 1024 && unit < units.length - 1) {
+    size /= 1024;
+    unit++;
+    one = (size * 10).round() / 10;
+  }
+  final text = one >= 10 || one == one.roundToDouble()
+      ? one.round().toString()
+      : one.toStringAsFixed(1);
   return '$text ${units[unit]}';
 }
 
@@ -178,22 +186,25 @@ class FoldersTable extends StatelessWidget {
     required this.folders,
     required this.ownerNameOf,
     required this.onOpen,
+    this.onDelete,
   });
 
   final List<FileFolder> folders;
   final String Function(String userId) ownerNameOf;
   final ValueChanged<FileFolder> onOpen;
+  final ValueChanged<FileFolder>? onDelete;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
 
     return _Table(
-      columns: const [
-        _Column('Name', 5),
-        _Column('Owner', 2, compact: false),
-        _Column('Date Created', 2),
-        _Column('Items', 1),
+      columns: [
+        const _Column('Name', 5),
+        const _Column('Owner', 2, compact: false),
+        const _Column('Date Created', 2),
+        const _Column('Items', 1),
+        if (onDelete != null) const _Column('', 1),
       ],
       rowCount: folders.length,
       onTapRow: (r) => onOpen(folders[r]),
@@ -208,6 +219,18 @@ class FoldersTable extends StatelessWidget {
           _cellText(context, ownerNameOf(folder.userId)),
           _cellText(context, formatFileDate(folder.createdAt)),
           _cellText(context, formatItemCount(folder.itemCount)),
+          if (onDelete != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                tooltip: 'Delete folder',
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+                icon: Icon(Icons.delete_outline, size: 18, color: colors.error),
+                onPressed: () => onDelete!(folder),
+              ),
+            ),
         ];
       },
     );
@@ -225,6 +248,7 @@ class FilesTable extends StatelessWidget {
     this.onRename,
     this.onMove,
     this.onShare,
+    this.canShare,
     this.onTogglePin,
     this.pinnedIds = const {},
     this.onInfo,
@@ -254,6 +278,9 @@ class FilesTable extends StatelessWidget {
   /// Shares a file with workspace members. When null, as in Deleted files,
   /// the menu has no Share.
   final ValueChanged<WorkspaceFile>? onShare;
+
+  /// Whether [onShare] is offered for a file. When null, every file has it.
+  final bool Function(WorkspaceFile file)? canShare;
 
   /// Pins a file, or unpins it when it is in [pinnedIds]. When null, as in
   /// Deleted files, the menu has neither.
@@ -356,7 +383,9 @@ class FilesTable extends StatelessWidget {
                 onPreview: preview == null ? null : () => preview(file),
                 onRename: rename == null ? null : () => rename(file),
                 onMove: move == null ? null : () => move(file),
-                onShare: share == null ? null : () => share(file),
+                onShare: share == null || !(canShare?.call(file) ?? true)
+                    ? null
+                    : () => share(file),
                 onTogglePin: togglePin == null ? null : () => togglePin(file),
                 isPinned: pinnedIds.contains(file.id),
                 onInfo: info == null ? null : () => info(file),

@@ -205,13 +205,32 @@ class _FilePreviewDialogState extends ConsumerState<FilePreviewDialog> {
           ),
         );
       case FilePreviewKind.text:
-        final text = utf8.decode(bytes, allowMalformed: true);
+        final text = _decodeText(bytes);
         // NUL characters mean a binary file with a text-like name.
-        if (text.contains('\u0000')) return broken();
+        if (text == null || text.contains('\u0000')) return broken();
         return _TextPreview(text: text);
       case FilePreviewKind.none:
         return broken();
     }
+  }
+
+  String? _decodeText(Uint8List bytes) {
+    if (bytes.length >= 2) {
+      final littleEndian = bytes[0] == 0xff && bytes[1] == 0xfe;
+      final bigEndian = bytes[0] == 0xfe && bytes[1] == 0xff;
+      if (littleEndian || bigEndian) {
+        // A UTF-16 BOM identifies text whose ASCII code units contain zero
+        // bytes. Decode those units before applying the binary-file guard.
+        if (bytes.length.isOdd) return null;
+        final data = ByteData.sublistView(bytes);
+        final endian = littleEndian ? Endian.little : Endian.big;
+        return String.fromCharCodes([
+          for (var offset = 2; offset < bytes.length; offset += 2)
+            data.getUint16(offset, endian),
+        ]);
+      }
+    }
+    return utf8.decode(bytes, allowMalformed: true);
   }
 }
 
