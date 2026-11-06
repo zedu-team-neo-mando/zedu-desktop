@@ -5,6 +5,8 @@ import 'package:mocktail/mocktail.dart';
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
+import '../../../../../helpers/helpers.dart';
+
 class MockAppLinks extends Mock implements AppLinks {}
 
 class FakeDeepLinkAuthNotifier extends AuthNotifier {
@@ -48,6 +50,9 @@ User _user({String? currentOrg}) => User(
 );
 
 void main() {
+  setUp(registerTestAppConfig);
+  tearDown(unregisterTestAppConfig);
+
   group('CreditsPaymentDeepLinkListener', () {
     late MockAppLinks mockAppLinks;
     late StreamController<Uri> linkController;

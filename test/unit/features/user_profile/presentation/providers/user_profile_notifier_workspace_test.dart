@@ -45,6 +45,9 @@ Future<Result<T>> _failed<T>() async {
 }
 
 void main() {
+  setUp(registerTestAppConfig);
+  tearDown(unregisterTestAppConfig);
+
   group('UserProfileNotifier.load', () {
     late MockUserProfileRepository repo;
     late MockSecureStorageService storage;

@@ -21,6 +21,9 @@ NotificationPreferences _prefs(NotificationMode mode) =>
     NotificationPreferences.empty().copyWith(mode: mode);
 
 void main() {
+  setUp(registerTestAppConfig);
+  tearDown(unregisterTestAppConfig);
+
   late _MockRepo repo;
 
   setUpAll(() {

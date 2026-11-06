@@ -107,6 +107,9 @@ Future<ProviderContainer> _pump(
 }
 
 void main() {
+  setUp(registerTestAppConfig);
+  tearDown(unregisterTestAppConfig);
+
   final older = DateTime(2026, 11, 1);
   final newer = DateTime(2026, 11, 3);
 

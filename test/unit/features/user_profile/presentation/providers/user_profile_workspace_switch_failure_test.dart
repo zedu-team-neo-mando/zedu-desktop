@@ -16,6 +16,9 @@ class _Workspaces extends WorkspaceNotifier {
 }
 
 void main() {
+  setUp(registerTestAppConfig);
+  tearDown(unregisterTestAppConfig);
+
   late _MockRepo repo;
 
   setUp(() {
