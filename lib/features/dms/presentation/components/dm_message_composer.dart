@@ -284,9 +284,20 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     }
 
     if (isEdit) {
-      ref
-          .read(chatHistoryProvider(widget.channelId))
-          .saveEdit(_editingMessageId!, text);
+      unawaited(
+        ref
+            .read(chatHistoryProvider(widget.channelId))
+            .saveEdit(_editingMessageId!, text)
+            .then((saved) {
+              if (saved || !mounted) return;
+              AppToastService.show(
+                context,
+                type: AppToastType.error,
+                message:
+                    'Could not save your edit. The message keeps its previous text.',
+              );
+            }),
+      );
       // An edit sends nothing new: the unsent reply and its draft come back,
       // and a waiting voice note or file is kept.
       _exitEditMode();
@@ -695,11 +706,8 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
     } catch (_) {}
   }
 
-  String _formatSeconds(int total) {
-    final minutes = total ~/ 60;
-    final seconds = (total % 60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
-  }
+  String _formatSeconds(int total) =>
+      formatClockDuration(Duration(seconds: total));
 
   Widget _buildRecordingBar(AppPalette colors) {
     return Padding(

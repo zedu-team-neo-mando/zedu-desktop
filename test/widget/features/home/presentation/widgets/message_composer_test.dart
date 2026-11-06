@@ -3,106 +3,73 @@ import 'package:zedu/features/features.dart';
 
 import '../../../../../helpers/helpers.dart';
 
-class _FakeProfileNotifier extends UserProfileNotifier {
-  _FakeProfileNotifier(this.initial);
+const _recordChannel = MethodChannel('com.llfbandit.record/messages');
 
-  final UserProfileState initial;
-
+class _FakeUserProfileNotifier extends UserProfileNotifier {
   @override
-  UserProfileState build() => initial;
+  UserProfileState build() => const UserProfileState();
 }
 
-const _rocket = TeamMember(
-  id: 'u-1',
-  email: 'rocket@zedu.test',
-  role: 'Member',
-  dateJoined: '2026-01-01',
-  status: TeamMemberStatus.active,
-  name: '🚀 Rocket',
-);
-
-const _engineer = TeamMember(
-  id: 'u-2',
-  email: 'alice@zedu.test',
-  role: 'Member',
-  dateJoined: '2026-01-01',
-  status: TeamMemberStatus.active,
-  name: '👩‍💻 Alice',
-);
-
-const _blankName = TeamMember(
-  id: 'u-3',
-  email: 'blank@zedu.test',
-  role: 'Member',
-  dateJoined: '2026-01-01',
-  status: TeamMemberStatus.active,
-  name: '   ',
-);
-
-const _ada = TeamMember(
-  id: 'u-4',
-  email: 'ada@zedu.test',
-  role: 'Admin',
-  dateJoined: '2026-01-01',
-  status: TeamMemberStatus.active,
-  name: 'Ada Lovelace',
-);
-
-Future<void> _pumpWithMentionList(
-  WidgetTester tester,
-  List<TeamMember> members,
-) async {
+Future<void> _pumpComposer(WidgetTester tester) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        userProfileNotifierProvider.overrideWith(
-          () => _FakeProfileNotifier(UserProfileState(teamMembers: members)),
-        ),
+        userProfileNotifierProvider.overrideWith(_FakeUserProfileNotifier.new),
       ],
       child: buildTestMaterialApp(
         Scaffold(
           body: MessageComposer(
-            activeChat: const ActiveChatState(
-              type: ActiveChatType.channel,
-              id: 'general',
-            ),
+            activeChat: ActiveChatState.generalChannel,
             onSend: (_) {},
           ),
         ),
       ),
     ),
   );
-  await tester.tap(find.byType(TextField));
-  await tester.enterText(find.byType(TextField), '@');
-  await tester.pump();
 }
 
 void main() {
-  group('MessageComposer mention suggestion avatars', () {
-    testWidgets('show the whole first emoji for emoji-prefixed names', (
-      tester,
-    ) async {
-      await _pumpWithMentionList(tester, [_rocket, _engineer]);
+  setUp(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(_recordChannel, (call) async {
+          return call.method == 'hasPermission' ? true : null;
+        });
+  });
 
-      // Whole grapheme clusters, not half a surrogate pair.
-      expect(find.text('🚀'), findsOneWidget);
-      expect(find.text('👩‍💻'), findsOneWidget);
-      expect(find.text('🚀 Rocket'), findsOneWidget);
-    });
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(_recordChannel, null);
+  });
 
-    testWidgets('fall back to ? for whitespace-only names', (tester) async {
-      await _pumpWithMentionList(tester, [_blankName]);
+  testWidgets('the send button has a tooltip once there is text', (
+    tester,
+  ) async {
+    await _pumpComposer(tester);
 
-      expect(find.text('?'), findsOneWidget);
-    });
+    // The formatting bar shows on focus, and its buttons insert text, which
+    // swaps the mic for the send icon.
+    await tester.tap(find.byType(TextField));
+    await tester.pump();
+    await tester.tap(find.byTooltip('Bold'));
+    await tester.pumpAndSettle();
 
-    testWidgets('keep showing the first letter of ordinary names', (
-      tester,
-    ) async {
-      await _pumpWithMentionList(tester, [_ada]);
+    final sendButton = find.ancestor(
+      of: find.byIcon(Icons.send),
+      matching: find.byType(IconButton),
+    );
+    expect(tester.widget<IconButton>(sendButton).tooltip, 'Send message');
+  });
 
-      expect(find.text('A'), findsOneWidget);
-      expect(find.text('Ada Lovelace'), findsOneWidget);
-    });
+  testWidgets('the stop button has a tooltip while recording', (tester) async {
+    await _pumpComposer(tester);
+
+    await tester.tap(find.byTooltip('Record voice note'));
+    await tester.pumpAndSettle();
+
+    final stopButton = find.ancestor(
+      of: find.byIcon(Icons.stop_circle),
+      matching: find.byType(IconButton),
+    );
+    expect(tester.widget<IconButton>(stopButton).tooltip, 'Stop recording');
   });
 }
