@@ -1,10 +1,18 @@
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
-final plannerRemoteDataSourceProvider = Provider<PlannerRemoteDataSource>(
-  (ref) =>
-      PlannerRemoteDataSourceImpl(apiBaseService: locator<ApiBaseService>()),
-);
+/// The sample list when the app runs with `USE_MOCK_DATA`, otherwise the real
+/// datasource. Until `GET /planner/checkpoints` exists, mock mode is the only
+/// way to see the planner populated, so it is wired here rather than in the
+/// view.
+final plannerRemoteDataSourceProvider = Provider<PlannerRemoteDataSource>((
+  ref,
+) {
+  if (locator<AppConfig>().usesMockData) {
+    return PlannerMockDataSource(now: ref.watch(plannerClockProvider));
+  }
+  return PlannerRemoteDataSourceImpl(apiBaseService: locator<ApiBaseService>());
+});
 
 final plannerRepositoryProvider = Provider<PlannerRepository>(
   (ref) => PlannerRepositoryImpl(
