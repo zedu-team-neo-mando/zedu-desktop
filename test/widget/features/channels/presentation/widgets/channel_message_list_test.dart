@@ -1,10 +1,12 @@
 import '../../../../../helpers/helpers.dart';
+
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
 class MockChannelRepository extends Mock implements ChannelRepository {}
 
-class FakeChatHistoryNotifier extends ChangeNotifier implements ChatHistoryNotifier {
+class FakeChatHistoryNotifier extends ChangeNotifier
+    implements ChatHistoryNotifier {
   FakeChatHistoryNotifier(this.channelId);
 
   @override
@@ -43,6 +45,7 @@ void main() {
     WidgetTester tester,
     Result<List<ChannelMessage>> r, {
     FakeChatHistoryNotifier? chatNotifier,
+    int unreadCount = 0,
   }) {
     when(
       () => repository.fetchChannelMessages('ch-1'),
@@ -58,10 +61,11 @@ void main() {
             ],
             retry: (_, _) => null,
             child: buildTestMaterialApp(
-              const Scaffold(
+              Scaffold(
                 body: ChannelMessageList(
                   channelId: 'ch-1',
-                  empty: Text('Welcome to #general'),
+                  empty: const Text('Welcome to #general'),
+                  unreadCount: unreadCount,
                 ),
               ),
             ),
@@ -144,7 +148,7 @@ void main() {
           'channel_id': 'ch-1',
           'status': 'sending',
           'created_at': DateTime.now().toIso8601String(),
-        }
+        },
       ];
 
       await pumpList(tester, const Success(<ChannelMessage>[]));
@@ -164,7 +168,7 @@ void main() {
           'channel_id': 'ch-1',
           'status': 'failed',
           'created_at': DateTime.now().toIso8601String(),
-        }
+        },
       ];
 
       await pumpList(tester, const Success(<ChannelMessage>[]));
@@ -176,4 +180,77 @@ void main() {
       expect(fakeChatHistory.retriedMessageId, 'failed-msg-1');
     },
   );
+
+  group('unread messages', () {
+    // Newest first, as the server sends them: 'msg N' is the newest.
+    Success<List<ChannelMessage>> messages(int n) => Success([
+      for (var i = n; i >= 1; i--)
+        ChannelMessage(senderName: 'Ada', text: 'msg $i'),
+    ]);
+
+    const divider = 'New messages';
+    final jump = find.byKey(const ValueKey('jump-to-first-unread'));
+
+    testWidgets('marks where the unread messages start', (tester) async {
+      await pumpList(tester, messages(5), unreadCount: 3);
+
+      // Unread: msg 5, msg 4, msg 3. The divider sits between msg 2 and msg 3.
+      expect(find.text(divider), findsOneWidget);
+      final dividerY = tester.getTopLeft(find.text(divider)).dy;
+      expect(tester.getTopLeft(find.text('msg 2')).dy, lessThan(dividerY));
+      expect(dividerY, lessThan(tester.getTopLeft(find.text('msg 3')).dy));
+    });
+
+    testWidgets('shows no divider when nothing was unread', (tester) async {
+      await pumpList(tester, messages(5));
+
+      expect(find.text(divider), findsNothing);
+      expect(jump, findsNothing);
+    });
+
+    testWidgets('a few unread messages get the divider but no jump button', (
+      tester,
+    ) async {
+      await pumpList(tester, messages(30), unreadCount: 3);
+
+      expect(find.text(divider), findsOneWidget);
+      expect(jump, findsNothing);
+    });
+
+    testWidgets('many unread messages offer a jump to the first one', (
+      tester,
+    ) async {
+      await pumpList(tester, messages(40), unreadCount: 25);
+
+      // The first unread message is msg 16, far above what is on screen.
+      expect(jump, findsOneWidget);
+      expect(find.text('Jump to first unread · 25 new'), findsOneWidget);
+      final viewportHeight = tester.view.physicalSize.height;
+      expect(
+        find.text('msg 16'),
+        findsNothing,
+        reason: 'the first unread message is far above what is on screen',
+      );
+
+      await tester.tap(jump);
+      await tester.pumpAndSettle();
+
+      final y = tester.getTopLeft(find.text('msg 16')).dy;
+      expect(y, inInclusiveRange(0, viewportHeight));
+      expect(jump, findsNothing);
+      expect(find.text(divider), findsOneWidget);
+    });
+
+    testWidgets('more unread than loaded puts the divider at the very top', (
+      tester,
+    ) async {
+      await pumpList(tester, messages(5), unreadCount: 50);
+
+      expect(find.text(divider), findsOneWidget);
+      expect(jump, findsOneWidget);
+      // Nothing is above the divider: it is above the oldest loaded message.
+      final dividerY = tester.getTopLeft(find.text(divider)).dy;
+      expect(dividerY, lessThan(tester.getTopLeft(find.text('msg 1')).dy));
+    });
+  });
 }

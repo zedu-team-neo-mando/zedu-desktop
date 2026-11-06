@@ -11,6 +11,11 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
   /// (switching A to B and back to A).
   int _loadCounter = 0;
 
+  /// The workspace whose organisation and notification data the state holds,
+  /// and whether any load has filled it yet.
+  String? _loadedOrgId;
+  bool _hasLoaded = false;
+
   @override
   UserProfileState build() {
     _repository = ref.read(userProfileRepositoryProvider);
@@ -60,6 +65,39 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
           error: result.error.friendlyMessage,
         );
     }
+  }
+
+  /// Uploads the image at [filePath] as the profile photo, then reloads the
+  /// account so the new photo link is used everywhere.
+  Future<void> uploadAvatar(String filePath) =>
+      _changeAvatar(() => _repository.uploadAvatar(filePath), 'Photo updated.');
+
+  /// Removes the profile photo, then reloads the account.
+  Future<void> removeAvatar() =>
+      _changeAvatar(_repository.removeAvatar, 'Photo removed.');
+
+  Future<void> _changeAvatar(
+    Future<Result<void>> Function() change,
+    String message,
+  ) async {
+    state = state.copyWith(
+      isSaving: true,
+      clearError: true,
+      clearSuccess: true,
+    );
+    final result = await change();
+    if (result case Failure<void>(:final error)) {
+      state = state.copyWith(isSaving: false, error: error.friendlyMessage);
+      return;
+    }
+    final refreshed = await _repository.getAccount();
+    state = state.copyWith(
+      account: refreshed is Success<ProfileAccount>
+          ? refreshed.value
+          : state.account,
+      isSaving: false,
+      successMessage: message,
+    );
   }
 
   /// Keeps only the fields the user edited (others become empty), so the
@@ -118,6 +156,10 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
           isSaving: false,
           successMessage: 'Account deleted successfully.',
         );
+        // The account no longer exists, so end the session too: clear the
+        // token and return to the login screen instead of staying signed in.
+        if (!ref.mounted) return;
+        await ref.read(authNotifierProvider.notifier).logout();
       case Failure<void>():
         state = state.copyWith(
           isSaving: false,
@@ -137,10 +179,19 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
       clearError: true,
       clearSuccess: true,
     );
+    final orgId = ref.read(workspaceProvider).selectedWorkspace?.id;
     final result = await _repository.updateNotificationPreferences(
-      orgId: ref.read(workspaceProvider).selectedWorkspace?.id,
+      orgId: orgId,
       preferences: preferences,
     );
+    // The user may have switched workspace while the save was in flight. Its
+    // answer belongs to the old workspace, so it must not replace what the new
+    // workspace shows or announce a save for it.
+    if (!ref.mounted) return;
+    if (ref.read(workspaceProvider).selectedWorkspace?.id != orgId) {
+      state = state.copyWith(isSaving: false);
+      return;
+    }
     switch (result) {
       case Success<NotificationPreferences>():
         state = state.copyWith(
@@ -649,16 +700,28 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
     // start, so check again right before writing the state.
     if (_isObsoleteLoad(loadId, orgId)) return;
 
+    // copyWith keeps the old value for a null, which is right for a retry on
+    // the same workspace. After switching workspace the old organisation and
+    // notification choices belong to another workspace, so a failed load must
+    // clear them instead of showing (and later saving) them under this one.
+    final switchedWorkspace = !_hasLoaded || _loadedOrgId != orgId;
+    final notifications = _valueOrNull(notificationResult);
+    final organization = _valueOrNull(organizationResult);
+    _loadedOrgId = orgId;
+    _hasLoaded = true;
+
     state = state.copyWith(
       account: _valueOrNull(accountResult),
-      notifications: _valueOrNull(notificationResult),
+      notifications: notifications,
       securitySessions: _valueOrNull(securityResult) ?? const [],
-      organization: _valueOrNull(organizationResult),
+      organization: organization,
       teamMembers: loadedTeamMembers,
       rolesAndPermissions: _valueOrNull(rolesResult) ?? const [],
       billing: _valueOrNull(billingResult),
       isLoading: false,
       error: error,
+      clearNotifications: switchedWorkspace && notifications == null,
+      clearOrganization: switchedWorkspace && organization == null,
     );
   }
 

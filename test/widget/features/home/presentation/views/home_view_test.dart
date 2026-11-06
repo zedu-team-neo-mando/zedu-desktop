@@ -24,6 +24,13 @@ class _EmptyChannelRepository extends Mock implements ChannelRepository {
 }
 
 /// Records leave calls and answers with [leaveResult].
+class _FakeNotificationService extends Fake
+    implements ChannelNotificationService {
+  @override
+  Future<ChannelNotificationPreference> load(String channelId) async =>
+      const ChannelNotificationPreference();
+}
+
 class _LeavingChannelRepository extends _EmptyChannelRepository {
   _LeavingChannelRepository(this.leaveResult);
 
@@ -59,6 +66,15 @@ class _FakeChannelNotifier extends ChannelNotifier {
   ];
 }
 
+class _CaseChannelNotifier extends ChannelNotifier {
+  @override
+  Future<List<Channel>> build() async => [
+    _channel('general'),
+    _channel('engineering'),
+    _channel('Engineering'),
+  ];
+}
+
 final _longName = List.filled(61, 'a').join();
 
 class _LongNameChannelNotifier extends ChannelNotifier {
@@ -86,6 +102,7 @@ void main() {
       ChannelNotifier Function() channels = _FakeChannelNotifier.new,
       double width = 1600,
       ChannelRepository? repository,
+      ChannelNotificationService? notificationService,
     }) async {
       tester.view.physicalSize = Size(width, 1000);
       tester.view.devicePixelRatio = 1;
@@ -100,6 +117,10 @@ void main() {
             channelRepositoryProvider.overrideWithValue(
               repository ?? _EmptyChannelRepository(),
             ),
+            if (notificationService != null)
+              channelNotificationServiceProvider.overrideWithValue(
+                notificationService,
+              ),
             dmDraftStoreProvider.overrideWith(
               (ref) => DmDraftStore(
                 FakeSecureStorageService(),
@@ -144,6 +165,27 @@ void main() {
       expect(find.text('Welcome to #random'), findsOneWidget);
       expect(find.text('# general'), findsNothing);
     });
+
+    testWidgets(
+      'channels whose names differ only by case open their own channel',
+      (tester) async {
+        await pumpSidebarAndChat(tester, channels: _CaseChannelNotifier.new);
+
+        String composerChannelId() => tester
+            .widget<DmMessageComposer>(find.byType(DmMessageComposer))
+            .channelId;
+
+        await tester.tap(find.text('Engineering'));
+        await tester.pumpAndSettle();
+        expect(find.text('# Engineering'), findsOneWidget);
+        expect(composerChannelId(), 'channel-Engineering');
+
+        await tester.tap(find.text('engineering'));
+        await tester.pumpAndSettle();
+        expect(find.text('# engineering'), findsOneWidget);
+        expect(composerChannelId(), 'channel-engineering');
+      },
+    );
 
     testWidgets('goes back to #general when the workspace changes', (
       tester,
@@ -217,6 +259,26 @@ void main() {
       expect(find.text('You left #random'), findsOneWidget);
       await tester.pump(const Duration(seconds: 5));
     });
+
+    testWidgets(
+      'the channel menu opens that channel\'s notification settings',
+      (tester) async {
+        await pumpSidebarAndChat(
+          tester,
+          notificationService: _FakeNotificationService(),
+        );
+
+        await tester.tap(find.text('random'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('channel-header-menu')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Notification settings'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Notifications for #random'), findsOneWidget);
+        expect(find.text('Mentions'), findsOneWidget);
+      },
+    );
 
     testWidgets('cancelling the dialog keeps the channel', (tester) async {
       final repository = _LeavingChannelRepository(const Success(null));

@@ -39,7 +39,10 @@ class AccountSection extends StatelessWidget {
               children: [
                 Stack(
                   children: [
-                    _AvatarBlock(initials: account.initials),
+                    _AvatarBlock(
+                      initials: account.initials,
+                      avatarUrl: account.avatarUrl,
+                    ),
                     Positioned(
                       top: 8,
                       right: 8,
@@ -85,6 +88,8 @@ class AccountSection extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 24),
+        const _AccessibilityCard(),
         const SizedBox(height: 48),
         AppButton.outlined(
           label: 'Delete my account',
@@ -123,21 +128,95 @@ class AccountSection extends StatelessWidget {
 }
 
 class _AvatarBlock extends StatelessWidget {
-  const _AvatarBlock({required this.initials});
+  const _AvatarBlock({required this.initials, required this.avatarUrl});
 
   final String initials;
+  final String? avatarUrl;
 
   @override
   Widget build(BuildContext context) {
+    final url = avatarUrl?.trim() ?? '';
+    final fallback = Center(
+      child: Text(
+        initials,
+        style: const TextStyle(
+          fontSize: 56,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF0B7A73),
+        ),
+      ),
+    );
     return Container(
       width: 160,
       height: 144,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: const Color(0xFFE9FBFA),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: const Center(
-        child: Icon(Icons.person, size: 96, color: Color(0xFF17C9BD)),
+      child: url.isEmpty
+          ? fallback
+          : Image.network(
+              url,
+              fit: BoxFit.cover,
+              // A broken link still shows who this account is.
+              errorBuilder: (_, _, _) => fallback,
+            ),
+    );
+  }
+}
+
+/// Settings that change how the app looks on this computer.
+class _AccessibilityCard extends ConsumerWidget {
+  const _AccessibilityCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reduceMotion = ref.watch(reduceMotionProvider);
+    final colors = context.colors;
+
+    return ProfileCard(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const ProfileFieldLabel('Accessibility'),
+          const SizedBox(height: 8),
+          MergeSemantics(
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Reduce motion',
+                        style: context.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Turn off non-essential animations and transitions '
+                        'on this computer.',
+                        style: context.textTheme.bodySmall?.copyWith(
+                          color: colors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Switch(
+                  value: reduceMotion,
+                  activeThumbColor: colors.onPrimary,
+                  activeTrackColor: colors.primary,
+                  onChanged: ref.read(reduceMotionProvider.notifier).set,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
