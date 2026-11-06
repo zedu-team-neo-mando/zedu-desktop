@@ -13,6 +13,29 @@ class _FakeWorkspaceNotifier extends WorkspaceNotifier {
   );
 }
 
+/// Signed in as Ada (u-1), who uploaded logo.png.
+class _FakeAuthNotifier extends AuthNotifier {
+  @override
+  AuthState build() => AuthState(
+    status: AuthStatus.authenticated,
+    user: User(
+      id: 'u-1',
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      email: 'ada@zedu.test',
+      phone: '',
+      username: 'ada',
+      isVerified: true,
+      isOnboarded: true,
+      createdAt: DateTime(2026, 1, 1),
+      currentOrg: 'org-1',
+      currentOrganisationSlug: 'org-1',
+      avatarUrl: '',
+      defaultAvatarUrl: '',
+    ),
+  );
+}
+
 class _FakeProfileNotifier extends UserProfileNotifier {
   @override
   UserProfileState build() => const UserProfileState(
@@ -85,10 +108,15 @@ class _FakePeopleRepository implements PeopleRepository {
 }
 
 class _FakeFilesRepository implements FilesRepository {
-  _FakeFilesRepository({this.failFolders = false, this.failCreate = false});
+  _FakeFilesRepository({
+    this.failFolders = false,
+    this.failCreate = false,
+    this.createFailure,
+  });
 
   final bool failFolders;
   final bool failCreate;
+  final ApiFailure? createFailure;
   final queries = <FilesQuery>[];
   final folderRequests = <(FilesScope, String?)>[];
   final createdFolders = <(String, String, String?)>[];
@@ -295,8 +323,14 @@ class _FakeFilesRepository implements FilesRepository {
     String? parentId,
   }) async {
     if (failCreate) {
-      return const Failure(ApiFailure(message: 'Folder name already exists'));
+      return const Failure(
+        ApiFailure(
+          message: 'Folder name already exists',
+          kind: ApiFailureKind.client,
+        ),
+      );
     }
+    if (createFailure case final error?) return Failure(error);
     createdFolders.add((name, orgId, parentId));
     return const Success(null);
   }
@@ -467,7 +501,7 @@ void main() {
     expect(find.text('Reports'), findsOneWidget);
   });
 
-  testWidgets('New Folder inside a folder sends it as the parent', (
+  testWidgets('inside a folder there is no Folders tab or New Folder', (
     tester,
   ) async {
     final repository = _FakeFilesRepository();
@@ -475,13 +509,18 @@ void main() {
 
     await tester.tap(find.text('docs'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('New Folder'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).last, 'drafts');
-    await tester.tap(find.text('Create'));
+
+    expect(find.text('spec.pdf'), findsOneWidget);
+    expect(find.text('Folders'), findsNothing);
+    expect(find.text('New Folder'), findsNothing);
+    expect(find.text('Upload File'), findsOneWidget);
+
+    // Back at the top level, both come back.
+    await tester.tap(find.widgetWithText(TextButton, 'All files'));
     await tester.pumpAndSettle();
 
-    expect(repository.createdFolders, [('drafts', 'org-1', 'docs')]);
+    expect(find.text('Folders'), findsWidgets);
+    expect(find.text('New Folder'), findsOneWidget);
   });
 
   testWidgets('New Folder shows the server error and stays open', (
@@ -498,6 +537,43 @@ void main() {
     expect(find.text('Folder name already exists'), findsOneWidget);
     expect(find.text('Create New Folder'), findsOneWidget);
   });
+
+  for (final (kind, expected) in [
+    (
+      ApiFailureKind.network,
+      'No internet connection. Check your network and try again.',
+    ),
+    (
+      ApiFailureKind.server,
+      'Something went wrong on our end. Please try again later.',
+    ),
+  ]) {
+    testWidgets('New Folder $kind shows safe copy and keeps the entered name', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        _FakeFilesRepository(
+          createFailure: ApiFailure(
+            message: '<html>internal-host failure</html>',
+            kind: kind,
+          ),
+        ),
+      );
+      await tester.tap(find.text('New Folder'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).last, 'Reports');
+      await tester.tap(find.text('Create'));
+      await tester.pumpAndSettle();
+      expect(find.text(expected), findsOneWidget);
+      expect(find.textContaining('internal-host'), findsNothing);
+      expect(find.text('Create New Folder'), findsOneWidget);
+      expect(
+        tester.widget<TextField>(find.byType(TextField).last).controller!.text,
+        'Reports',
+      );
+    });
+  }
 
   Future<void> openFilesTab(WidgetTester tester) async {
     await tester.tap(find.text('Files').last);
@@ -975,6 +1051,26 @@ void main() {
     await tester.tap(find.text(name));
     await tester.pumpAndSettle();
   }
+
+  testWidgets('Share is offered only on files you uploaded', (tester) async {
+    final repository = _FakeFilesRepository()
+      ..moreFiles = [
+        const WorkspaceFile(id: 'f-2', name: 'brief.pdf', userId: 'u-2'),
+      ];
+    await _pump(tester, repository);
+    await openFilesTab(tester);
+
+    await tester.tap(find.byTooltip('More actions for brief.pdf'));
+    await tester.pumpAndSettle();
+    expect(find.text('Download'), findsOneWidget);
+    expect(find.text('Share'), findsNothing);
+    await tester.tapAt(Offset.zero);
+    await tester.pumpAndSettle();
+
+    await tester.tap(actionsMenu());
+    await tester.pumpAndSettle();
+    expect(find.text('Share'), findsOneWidget);
+  });
 
   testWidgets('shares a file with a member by direct message', (tester) async {
     final repository = _FakeFilesRepository();

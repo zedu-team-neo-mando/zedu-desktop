@@ -138,7 +138,7 @@ class _QuickSwitcherLoaderState extends ConsumerState<_QuickSwitcherLoader> {
     return QuickSwitcherDialog(
       entries: [
         ...?channels.value
-            ?.where((c) => !c.archived)
+            ?.where((c) => !c.archived && c.hasAccess)
             .map((c) => QuickSwitcherEntry.channel(c.name, channelId: c.id)),
         ...?dms.value?.map(QuickSwitcherEntry.dm),
       ],

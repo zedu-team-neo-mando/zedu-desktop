@@ -166,6 +166,8 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
           isSaving: false,
           successMessage: 'Notification preferences saved successfully.',
         );
+        // Desktop pop-ups read their own copy; refresh it to the saved values.
+        ref.invalidate(desktopNotificationPreferencesProvider);
       case Failure<NotificationPreferences>():
         state = state.copyWith(
           isSaving: false,
@@ -269,7 +271,7 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
                 name: result.value.name,
                 avatar: '',
                 unreadCount: 0,
-                channelsCount: 0,
+                membersCount: 0,
               ),
             );
       case Failure<OrganizationProfile>():
@@ -433,18 +435,16 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
     }
   }
 
-  Future<List<Map<String, dynamic>>> fetchRegisteredUsers() async {
-    try {
-      final api = locator<ApiBaseService>();
-      final response = await api.get<Map<String, dynamic>>(path: '/users');
-      final data = response.data['data'] as List<dynamic>?;
-      if (data != null) {
-        return data.cast<Map<String, dynamic>>();
-      }
-    } catch (e) {
-      // ignore
-    }
-    return [];
+  /// Members of the selected organisation, for people pickers. Unlike
+  /// `GET /users`, this never includes accounts from other organisations.
+  Future<List<TeamMember>> fetchOrganisationMembers() async {
+    final orgId = ref.read(workspaceProvider).selectedWorkspace?.id;
+    if (orgId == null) return const [];
+    final result = await _repository.getTeamMembers(orgId: orgId);
+    return switch (result) {
+      Success<List<TeamMember>>() => result.value,
+      Failure<List<TeamMember>>() => const [],
+    };
   }
 
   Future<void> inviteMember({
@@ -636,8 +636,10 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
 
     var loadedTeamMembers = _valueOrNull(teamResult) ?? const [];
 
-    // Load persisted mock members if they exist
-    if (orgId != null) {
+    // Persisted mock members belong to mock mode only: outside it the API list
+    // is the truth, and a key left behind by an earlier mock run would replace
+    // the real team members every time the profile loads.
+    if (orgId != null && locator<AppConfig>().usesMockData) {
       final storage = locator<SecureStorageService>();
       final data = await storage.readData('mock_team_members_$orgId');
       if (data != null) {

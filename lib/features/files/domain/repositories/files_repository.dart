@@ -65,4 +65,7 @@ abstract class FilesRepository {
   Future<Result<void>> pinFile(String fileId);
 
   Future<Result<void>> unpinFile(String fileId);
+
+  /// Deletes the folder [id] and its contents.
+  Future<Result<void>> deleteFolder(String id);
 }

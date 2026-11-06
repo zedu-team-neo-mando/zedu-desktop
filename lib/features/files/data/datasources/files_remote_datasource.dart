@@ -65,6 +65,8 @@ abstract class FilesRemoteDataSource {
   Future<void> pinFile(String fileId);
 
   Future<void> unpinFile(String fileId);
+
+  Future<void> deleteFolder(String id);
 }
 
 /// Reads `current_page` and `total_pages_count` (or `total_pages`).
@@ -363,5 +365,14 @@ class FilesRemoteDataSourceImpl implements FilesRemoteDataSource {
   @override
   Future<void> unpinFile(String fileId) async {
     await apiBaseService.delete<dynamic>(path: '/files/file/$fileId/pin');
+  }
+
+  /// Deletes the folder, as the web app does. The server removes the
+  /// folder and its contents.
+  @override
+  Future<void> deleteFolder(String id) async {
+    await apiBaseService.delete<Map<String, dynamic>>(
+      path: '/files/folders/$id',
+    );
   }
 }

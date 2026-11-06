@@ -71,6 +71,10 @@ class FilesRepositoryImpl implements FilesRepository {
     ),
   );
 
+  @override
+  Future<Result<void>> deleteFolder(String id) =>
+      _guard(() => remoteDataSource.deleteFolder(id));
+
   Future<Result<T>> _guard<T>(Future<T> Function() call) async {
     try {
       return Success(await call());

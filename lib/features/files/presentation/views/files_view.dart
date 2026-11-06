@@ -13,6 +13,10 @@ class FilesView extends ConsumerWidget {
     final title = state.folderPath.isEmpty
         ? state.view.label
         : state.folderPath.last.name;
+    // Folders are one level deep on the backend: it ignores parent_id, so
+    // inside a folder there are no subfolders to list or create.
+    final inFolder = state.folderPath.isNotEmpty;
+    final tab = inFolder ? FilesTab.files : state.tab;
 
     return Container(
       color: colors.onPrimary,
@@ -42,12 +46,14 @@ class FilesView extends ConsumerWidget {
                 if (state.view != FilesScope.trash) ...[
                   const _UploadButton(),
                   const SizedBox(width: 12),
-                  _HeaderButton(
-                    icon: Icons.create_new_folder_outlined,
-                    label: 'New Folder',
-                    onPressed: () => _newFolder(context),
-                  ),
-                  const SizedBox(width: 8),
+                  if (!inFolder) ...[
+                    _HeaderButton(
+                      icon: Icons.create_new_folder_outlined,
+                      label: 'New Folder',
+                      onPressed: () => _newFolder(context),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                 ],
                 IconButton(
                   tooltip: 'Refresh',
@@ -70,10 +76,12 @@ class FilesView extends ConsumerWidget {
                   _Breadcrumbs(state: state),
                 ],
                 const SizedBox(height: 16),
-                _Tabs(selected: state.tab),
-                const SizedBox(height: 24),
+                if (!inFolder) ...[
+                  _Tabs(selected: tab),
+                  const SizedBox(height: 24),
+                ],
                 Text(
-                  state.tab == FilesTab.folders ? 'Folders' : 'Files',
+                  tab == FilesTab.folders ? 'Folders' : 'Files',
                   style: context.textTheme.titleMedium?.copyWith(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
@@ -81,7 +89,7 @@ class FilesView extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                if (state.tab == FilesTab.folders)
+                if (tab == FilesTab.folders)
                   const _FoldersSection()
                 else
                   const _FilesSection(),
@@ -222,6 +230,7 @@ class _FoldersSection extends ConsumerWidget {
               folders: page.folders,
               ownerNameOf: ownerName,
               onOpen: notifier.openFolder,
+              onDelete: (folder) => _deleteFolder(context, ref, folder),
             ),
             if (page.totalPages > 1)
               _Pagination(
@@ -392,6 +401,7 @@ class _FilesSection extends ConsumerWidget {
         ? const <String>{}
         : ref.watch(pinnedFilesProvider).value ?? const <String>{};
     final ownerName = _ownerNames(ref);
+    final myId = ref.watch(authNotifierProvider.select((s) => s.user?.id));
 
     return page.when(
       loading: () => const _Loading(),
@@ -429,6 +439,9 @@ class _FilesSection extends ConsumerWidget {
           onRename: isTrash ? null : (file) => _rename(context, file),
           onMove: isTrash ? null : (file) => _move(context, file),
           onShare: isTrash ? null : (file) => _share(context, file),
+          // zedu-be lets only the person who uploaded a file share it, so
+          // other people's files don't offer a Share that can only fail.
+          canShare: (file) => myId != null && file.userId == myId,
           onInfo: isTrash
               ? null
               : (file) => FileInfoPanel.show(
@@ -528,6 +541,47 @@ Future<void> _newFolder(BuildContext context) async {
   }
 }
 
+Future<void> _deleteFolder(
+  BuildContext context,
+  WidgetRef ref,
+  FileFolder folder,
+) async {
+  final colors = context.colors;
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: colors.onPrimary,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      title: Text('Delete "${folder.name}"?'),
+      content: const Text(
+        'The folder and everything inside it will be deleted.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: colors.error,
+            foregroundColor: colors.onPrimary,
+          ),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+  final error = await ref
+      .read(filesActionsProvider.notifier)
+      .deleteFolder(folder);
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(error ?? 'Folder deleted')),
+  );
+}
+
 /// Picks files and uploads them, showing progress on the button.
 class _UploadButton extends ConsumerWidget {
   const _UploadButton();
@@ -549,7 +603,11 @@ class _UploadButton extends ConsumerWidget {
         .uploadFiles(files);
     if (!context.mounted) return;
     final failed = outcome.failedNames;
-    final message = failed.isEmpty
+    final message = outcome.workspaceChanged
+        ? 'Workspace changed. ${outcome.skippedNames.length} remaining files '
+              'were not uploaded. A file already in progress may have '
+              'completed in the previous workspace.'
+        : failed.isEmpty
         ? (outcome.uploaded == 1
               ? 'File uploaded'
               : '${outcome.uploaded} files uploaded')

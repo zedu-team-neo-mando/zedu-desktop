@@ -22,6 +22,7 @@ class SidebarChannelList extends ConsumerWidget {
             .where(
               (c) =>
                   !c.archived &&
+                  c.hasAccess &&
                   (c.organisationId.isEmpty || c.organisationId == orgId),
             )
             .toList();

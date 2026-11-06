@@ -10,6 +10,9 @@ class _FakeProfileNotifier extends UserProfileNotifier {
 
   @override
   UserProfileState build() => initial;
+
+  @override
+  Future<void> load() async {}
 }
 
 const _rocket = TeamMember(
@@ -76,7 +79,7 @@ Future<void> _pumpWithMentionList(
   await tester.tap(find.byType(TextField));
   await tester.pumpAndSettle();
   await tester.enterText(find.byType(TextField), '@');
-  await tester.pump();
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -86,7 +89,6 @@ void main() {
     ) async {
       await _pumpWithMentionList(tester, [_rocket, _engineer]);
 
-      // Whole grapheme clusters, not half a surrogate pair.
       expect(find.text('🚀'), findsOneWidget);
       expect(find.text('👩‍💻'), findsOneWidget);
       expect(find.text('🚀 Rocket'), findsOneWidget);
