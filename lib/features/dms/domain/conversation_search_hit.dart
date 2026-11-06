@@ -1,3 +1,5 @@
+import 'package:zedu/features/dms/domain/message_plain_text.dart';
+
 /// One message found by the server's search of a single conversation.
 class ConversationSearchHit {
   final String messageId;
@@ -52,19 +54,10 @@ class ConversationSearchHit {
     return hits;
   }
 
-  /// Message content is HTML. Show what the person actually wrote, so no tags
-  /// appear in the results.
-  static String plainText(Object? content) => (content?.toString() ?? '')
-      .replaceAll(RegExp(r'</?(p|div|li|ul|ol|br|blockquote|pre)\b[^>]*>'), ' ')
-      .replaceAll(RegExp(r'<[^>]*>'), '')
-      .replaceAll('&nbsp;', ' ')
-      .replaceAll('&lt;', '<')
-      .replaceAll('&gt;', '>')
-      .replaceAll('&quot;', '"')
-      .replaceAll('&#39;', "'")
-      .replaceAll('&amp;', '&')
-      .replaceAll(RegExp(r'\s+'), ' ')
-      .trim();
+  /// Message content is HTML. Show what the person actually wrote, so neither
+  /// tags nor entities appear in the results.
+  static String plainText(Object? content) =>
+      htmlMessageToPlainText(content?.toString() ?? '');
 
   /// "4:05 PM" for today, "Nov 3, 4:05 PM" for earlier days.
   String? get sentAtLabel {

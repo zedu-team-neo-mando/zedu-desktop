@@ -46,6 +46,41 @@ void main() {
       );
     });
 
+    test('decodes entities that arrived escaped twice', () {
+      expect(
+        ConversationSearchHit.plainText('<p>Hello&amp;nbsp;</p>'),
+        'Hello',
+      );
+      expect(
+        ConversationSearchHit.plainText('<p>one&amp;nbsp;two</p>'),
+        'one two',
+      );
+    });
+
+    test('keeps separate paragraphs on separate lines', () {
+      expect(
+        ConversationSearchHit.plainText(
+          '<p>first line</p><p>second line<br>third</p>',
+        ),
+        'first line\nsecond line\nthird',
+      );
+    });
+
+    test('keeps angle brackets that the sender typed', () {
+      expect(
+        ConversationSearchHit.plainText('<p>Use List&lt;String&gt; here</p>'),
+        'Use List<String> here',
+      );
+      expect(
+        ConversationSearchHit.plainText('Ada <ada@zedu.chat> wrote'),
+        'Ada <ada@zedu.chat> wrote',
+      );
+      expect(
+        ConversationSearchHit.plainText('wrap it in a <div> element'),
+        'wrap it in a <div> element',
+      );
+    });
+
     test('skips messages without an id and survives odd data', () {
       expect(ConversationSearchHit.fromResponse(null), isEmpty);
       expect(ConversationSearchHit.fromResponse({'data': 1}), isEmpty);
