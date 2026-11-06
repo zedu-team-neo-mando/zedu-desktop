@@ -821,6 +821,8 @@ class _DmChatHeader extends StatelessWidget {
           const Spacer(),
           Consumer(
             builder: (context, ref, child) {
+              // Real Buzz calls are still being finished (Ziki #1249).
+              if (!kUnfinishedFeaturesEnabled) return const SizedBox.shrink();
               return InkWell(
                 onTap: () {
                   ref
@@ -849,7 +851,7 @@ class _DmChatHeader extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(width: 12),
+          if (kUnfinishedFeaturesEnabled) const SizedBox(width: 12),
           PopupMenuButton<String>(
             tooltip: 'More options',
             position: PopupMenuPosition.under,

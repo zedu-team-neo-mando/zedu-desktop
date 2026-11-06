@@ -15,6 +15,12 @@ const String kDefaultDesktopGoogleClientId =
 /// The website's Contact Sales page, opened from the Enterprise plan.
 const String kDefaultContactSalesUrl = 'https://zedu.chat/contact-sales';
 
+/// The live Centrifugo websocket, used when `CONNECT_URL` comes from neither
+/// `--dart-define` nor `.env`. It carries realtime events such as incoming
+/// Buzz calls; the web app reads the same URL from `NEXT_PUBLIC_CONNECT_URL`.
+const String kDefaultConnectUrl =
+    'wss://api.zedu.chat/centrifugo/connection/websocket';
+
 /// Microsoft Store builds pass `--dart-define=STORE_BUILD=true`. Store
 /// certification fails a product for any control that does nothing or only
 /// says "not available yet", so these builds hide unfinished features.
@@ -47,6 +53,7 @@ class AppConfig {
     this.googleClientId = kDefaultDesktopGoogleClientId,
     this.googleClientSecret = '',
     this.contactSalesUrl = kDefaultContactSalesUrl,
+    this.connectUrl = kDefaultConnectUrl,
   });
 
   /// Resolves config after [loadAppEnv] has run in [main] (root `.env` /
@@ -59,11 +66,13 @@ class AppConfig {
     const defineUsesMock = String.fromEnvironment('USE_MOCK_DATA');
     const defineClientId = String.fromEnvironment('GOOGLE_CLIENT_ID');
     const defineClientSecret = String.fromEnvironment('GOOGLE_CLIENT_SECRET');
+    const defineConnectUrl = String.fromEnvironment('CONNECT_URL');
 
     final envApiBaseUrl = dotenv.maybeGet('API_BASE_URL')?.trim();
     final envUsesMock = dotenv.maybeGet('USE_MOCK_DATA')?.trim();
     final envClientId = dotenv.maybeGet('GOOGLE_CLIENT_ID')?.trim();
     final envClientSecret = dotenv.maybeGet('GOOGLE_CLIENT_SECRET')?.trim();
+    final envConnectUrl = dotenv.maybeGet('CONNECT_URL')?.trim();
 
     // Teams point the app at their own backend via --dart-define or .env; Zedu staging is the default.
     String apiBaseUrl = defineApiBaseUrl.isNotEmpty
@@ -96,11 +105,18 @@ class AppConfig {
         ? envClientSecret!
         : '';
 
+    final connectUrl = defineConnectUrl.isNotEmpty
+        ? defineConnectUrl
+        : (envConnectUrl?.isNotEmpty ?? false)
+        ? envConnectUrl!
+        : kDefaultConnectUrl;
+
     return AppConfig(
       apiBaseUrl: apiBaseUrl,
       usesMockData: usesMockData,
       googleClientId: googleClientId,
       googleClientSecret: googleClientSecret,
+      connectUrl: connectUrl,
     );
   }
 
@@ -109,6 +125,9 @@ class AppConfig {
   final String googleClientId;
   final String googleClientSecret;
   final String contactSalesUrl;
+
+  /// Centrifugo websocket for realtime events (`CONNECT_URL`).
+  final String connectUrl;
 }
 
 bool _parseBool(String raw, {required bool defaultValue}) {
