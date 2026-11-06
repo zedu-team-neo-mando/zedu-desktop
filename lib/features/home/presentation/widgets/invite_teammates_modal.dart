@@ -132,7 +132,7 @@ class _InviteTeammatesModalState extends ConsumerState<InviteTeammatesModal> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Successfully invited $successCount ${successCount == 1 ? 'teammate' : 'teammates'}.',
+            "Successfully invited $successCount ${successCount == 1 ? 'teammate' : 'teammates'}.",
           ),
           backgroundColor: context.colors.success,
         ),

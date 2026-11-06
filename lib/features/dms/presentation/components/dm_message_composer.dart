@@ -820,23 +820,15 @@ class DmMessageComposerState extends ConsumerState<DmMessageComposer> {
       type: FileType.any,
     );
     if (result == null) return;
+    // The paths come from the system file dialog, so there is no traversal to
+    // guard against: on macOS and Linux every one of them starts with '/', and
+    // a name such as `notes..v2.txt` is ordinary. `addFiles` checks that each
+    // file exists and is under the size limit. The MIME type is left unset
+    // because the upload works it out from the file name; `f.extension` is a
+    // bare extension such as `pdf`, not a MIME type.
     final picked = result.files
         .where((PlatformFile f) => f.path != null)
-        .map((PlatformFile f) {
-          // Validate file path to prevent path traversal and invalid files
-          if (f.path == null ||
-              f.path!.contains('..') ||
-              f.path!.startsWith('/')) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Invalid file path: ${f.path}')),
-              );
-            }
-            return null;
-          }
-          return XFile(f.path!, name: f.name, mimeType: f.extension);
-        })
-        .whereType<XFile>()
+        .map((PlatformFile f) => XFile(f.path!, name: f.name))
         .toList();
     await addFiles(picked);
   }
