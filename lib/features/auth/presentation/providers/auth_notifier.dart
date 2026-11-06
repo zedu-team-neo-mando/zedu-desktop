@@ -237,13 +237,41 @@ class AuthNotifier extends Notifier<AuthState> {
     final result = await _repository.getCurrentUser();
     switch (result) {
       case Success<User>():
-        state = state.copyWith(user: result.value);
+        state = state.copyWith(user: _mergeUser(state.user, result.value));
       case Failure<User>():
         AppLogger.w(
           'Failed to refresh user — ${result.error.message}',
           tag: _tag,
         );
     }
+  }
+
+  /// Server-owned fields (identity, profile, presence) update from the fresh
+  /// user, while locally tracked credit fields keep their current values:
+  /// /users/me can lag the purchase flow, so swapping them in would reset the
+  /// balance, plan and AI-credits flag the user just saw change (Ziki #2856).
+  User _mergeUser(User? current, User fresh) {
+    if (current == null) return fresh;
+    return User(
+      id: fresh.id,
+      firstName: fresh.firstName,
+      lastName: fresh.lastName,
+      fullName: fresh.fullName,
+      email: fresh.email,
+      phone: fresh.phone,
+      username: fresh.username,
+      isVerified: fresh.isVerified,
+      isOnboarded: fresh.isOnboarded,
+      createdAt: fresh.createdAt,
+      currentOrg: fresh.currentOrg,
+      currentOrganisationSlug: fresh.currentOrganisationSlug,
+      avatarUrl: fresh.avatarUrl,
+      defaultAvatarUrl: fresh.defaultAvatarUrl,
+      creditBalance: current.creditBalance,
+      subscriptionPlanId: current.subscriptionPlanId,
+      aiCreditsPurchasable: current.aiCreditsPurchasable,
+      status: fresh.status,
+    );
   }
 
   Future<void> loginWithGoogle() async {
