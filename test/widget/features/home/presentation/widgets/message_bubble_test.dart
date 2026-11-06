@@ -27,6 +27,51 @@ Widget _wrapBottomRight(Widget child) {
 }
 
 void main() {
+  group('MessageBubble voice notes', () {
+    testWidgets('each voice note shows its own length', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          const Column(
+            children: [
+              MessageBubble(
+                author: 'Alice',
+                text: '[Voice Note Attached:3]',
+                timestamp: '10:00 AM',
+              ),
+              MessageBubble(
+                author: 'Bob',
+                text: '[Voice Note Attached:125]',
+                timestamp: '10:01 AM',
+              ),
+            ],
+          ),
+        ),
+      );
+
+      expect(find.text('0:03'), findsOneWidget);
+      expect(find.text('2:05'), findsOneWidget);
+      expect(find.text('0:05'), findsNothing);
+    });
+
+    testWidgets('an older voice note without a length shows no length', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          const MessageBubble(
+            author: 'Alice',
+            text: '[Voice Note Attached]',
+            timestamp: '10:00 AM',
+          ),
+        ),
+      );
+
+      expect(find.byIcon(Icons.play_circle_fill), findsOneWidget);
+      expect(find.text('0:05'), findsNothing);
+      expect(find.textContaining(RegExp(r'^\d+:\d\d$')), findsNothing);
+    });
+  });
+
   group('MessageBubble Author Initial Tests', () {
     testWidgets('renders standard author initial correctly', (tester) async {
       await tester.pumpWidget(
@@ -92,6 +137,27 @@ void main() {
       );
 
       expect(find.text('?'), findsOneWidget);
+    });
+  });
+
+  group('MessageBubble voice note', () {
+    testWidgets('draws the waveform without loading a missing asset', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _wrap(
+          const MessageBubble(
+            author: 'Alice',
+            text: '[Voice Note Attached]',
+            timestamp: '10:10 AM',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const ValueKey('voice-note-waveform')), findsOneWidget);
+      expect(find.byIcon(Icons.play_circle_fill), findsOneWidget);
     });
   });
 
