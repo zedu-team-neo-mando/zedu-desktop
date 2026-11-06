@@ -28,15 +28,15 @@ void main() {
     final baseUrl = 'http://127.0.0.1:${server.port}/';
     final config = AppConfig(apiBaseUrl: baseUrl, usesMockData: false);
     storage = _MemoryStorage();
-    final interceptor = AuthInterceptor(storage: storage);
-    locator.registerSingleton<SecureStorageService>(storage);
-    locator.registerSingleton<AuthInterceptor>(interceptor);
     // Exercise actual transport and auth state handling quickly. The separate
     // API-client tests verify the production 15/30/30-second defaults.
     dio = Dio(
       ApiBaseService.createOptions(baseUrl)
         ..receiveTimeout = const Duration(milliseconds: 100),
     );
+    final interceptor = AuthInterceptor(storage: storage, dio: dio);
+    locator.registerSingleton<SecureStorageService>(storage);
+    locator.registerSingleton<AuthInterceptor>(interceptor);
     dio.interceptors.add(interceptor);
     final repository = AuthRepositoryImpl(
       remote: AuthRemoteDataSourceImpl(

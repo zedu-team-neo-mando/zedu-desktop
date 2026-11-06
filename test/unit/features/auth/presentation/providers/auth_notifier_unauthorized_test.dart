@@ -34,7 +34,7 @@ void main() {
     setUp(() {
       repository = MockAuthRepository();
       storage = MockSecureStorageService();
-      interceptor = AuthInterceptor(storage: storage);
+      interceptor = AuthInterceptor(storage: storage, dio: Dio());
 
       when(() => storage.deleteAccessToken()).thenAnswer((_) async {});
 

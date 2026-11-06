@@ -40,7 +40,8 @@ void main() {
   test('a request still completes when reading the token throws', () async {
     final dio = Dio(BaseOptions(baseUrl: 'http://example.test/'))
       ..httpClientAdapter = _StatusAdapter(200);
-    dio.interceptors.add(AuthInterceptor(storage: _ThrowingReadStorage()));
+    dio.interceptors
+        .add(AuthInterceptor(storage: _ThrowingReadStorage(), dio: dio));
 
     final response = await dio
         .get<dynamic>('a')
@@ -57,7 +58,7 @@ void main() {
         ..httpClientAdapter = _StatusAdapter(401);
       var signedOut = 0;
       dio.interceptors.add(
-        AuthInterceptor(storage: _ThrowingDeleteStorage())
+        AuthInterceptor(storage: _ThrowingDeleteStorage(), dio: dio)
           ..onUnauthorized = () => signedOut++,
       );
 

@@ -22,7 +22,7 @@ void main() {
 
       locator.registerSingleton<SecureStorageService>(storage);
       locator.registerSingleton<AuthInterceptor>(
-        AuthInterceptor(storage: storage),
+        AuthInterceptor(storage: storage, dio: Dio()),
       );
 
       container = ProviderContainer(
