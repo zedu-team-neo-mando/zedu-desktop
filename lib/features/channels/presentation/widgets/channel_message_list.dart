@@ -62,9 +62,8 @@ class _ChannelMessageListState extends ConsumerState<ChannelMessageList> {
                 ? m['avatar_url'] as String
                 : chatHistory.currentUserAvatarUrl,
             text: m['content']?.toString() ?? '',
-            createdAt: DateTime.tryParse(
-              m['created_at']?.toString() ?? '',
-            )?.toLocal(),
+            createdAt: DateTime.tryParse(m['created_at']?.toString() ?? '')
+                ?.toLocal(),
             status: m['status']?.toString(),
           ),
         )
@@ -159,12 +158,8 @@ class _ChannelMessageListState extends ConsumerState<ChannelMessageList> {
         final message = messages[index];
         final tile = ChannelMessageTile(
           message: message,
-          saveAction:
-              message.status == null && message.id != null
-              ? SaveLaterButton(
-                  channelId: channelId,
-                  threadId: message.id!,
-                )
+          saveAction: message.status == null && message.id != null
+              ? SaveLaterButton(channelId: channelId, threadId: message.id!)
               : null,
           onRetry: message.id != null
               ? () => ref
