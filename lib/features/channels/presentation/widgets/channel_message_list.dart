@@ -62,8 +62,9 @@ class _ChannelMessageListState extends ConsumerState<ChannelMessageList> {
                 ? m['avatar_url'] as String
                 : chatHistory.currentUserAvatarUrl,
             text: m['content']?.toString() ?? '',
-            createdAt: DateTime.tryParse(m['created_at']?.toString() ?? '')
-                ?.toLocal(),
+            createdAt: DateTime.tryParse(
+              m['created_at']?.toString() ?? '',
+            )?.toLocal(),
             status: m['status']?.toString(),
           ),
         )
