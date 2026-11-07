@@ -156,9 +156,10 @@ class _ChannelMessageListState extends ConsumerState<ChannelMessageList> {
       itemCount: messages.length,
       itemBuilder: (context, index) {
         final message = messages[index];
+        final canSave = message.status == null && message.id != null;
         final tile = ChannelMessageTile(
           message: message,
-          saveAction: message.status == null && message.id != null
+          saveAction: canSave
               ? SaveLaterButton(channelId: channelId, threadId: message.id!)
               : null,
           onRetry: message.id != null
