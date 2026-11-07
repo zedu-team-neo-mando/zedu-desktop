@@ -7,6 +7,7 @@ class AppSidebarRail extends ConsumerStatefulWidget {
     required this.activeType,
     this.onTypeSelected,
     this.settingsSelected = false,
+    this.laterSelected = false,
   });
 
   static const double width = 50;
@@ -14,6 +15,7 @@ class AppSidebarRail extends ConsumerStatefulWidget {
   final HomeSidebarType? activeType;
   final ValueChanged<HomeSidebarType>? onTypeSelected;
   final bool settingsSelected;
+  final bool laterSelected;
 
   @override
   ConsumerState<AppSidebarRail> createState() => _AppSidebarRailState();
@@ -91,6 +93,11 @@ class _AppSidebarRailState extends ConsumerState<AppSidebarRail> {
             onTap: () => select(HomeSidebarType.people),
           ),
           _RailNavItem(
+            icon: Icons.bookmark_border,
+            label: 'Later',
+            isActive: widget.laterSelected,
+            onTap: () => context.go(AppRouter.later),
+          ),
             icon: Icons.folder_open_outlined,
             label: 'Files',
             isActive: activeType == HomeSidebarType.files,
