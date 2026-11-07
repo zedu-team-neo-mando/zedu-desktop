@@ -207,6 +207,12 @@ class _SettingsNavigation extends StatelessWidget {
                   ),
                   _NavigationTile(
                     icon: Icons.webhook_outlined,
+                    label: 'Channel Management',
+                    selected: selectedSection == UserProfileSection.channelManagement,
+                    onTap: () => onSectionSelected(UserProfileSection.channelManagement),
+                  ),
+                  _NavigationTile(
+                    icon: Icons.webhook_outlined,
                     label: 'Webhooks',
                     selected: selectedSection == UserProfileSection.webhooks,
                     onTap: () => onSectionSelected(UserProfileSection.webhooks),

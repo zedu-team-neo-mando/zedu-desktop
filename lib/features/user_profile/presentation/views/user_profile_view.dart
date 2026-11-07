@@ -146,6 +146,7 @@ class _ProfileContent extends StatelessWidget {
             ),
             UserProfileSection.rolesAndPermissions =>
               RolesAndPermissionsSection(roles: state.rolesAndPermissions),
+            UserProfileSection.channelManagement => const ChannelManagementSection(),
             UserProfileSection.webhooks => const WebhooksSection(),
             UserProfileSection.billing => BillingSection(
               billing: state.billing ?? BillingInfo.empty(),
