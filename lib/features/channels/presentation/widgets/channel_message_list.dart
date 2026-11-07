@@ -295,7 +295,7 @@ class ChannelMessageTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (saveAction != null) saveAction!,
+                ?saveAction,
                 const SizedBox(height: 4),
                 ReportMessageMenu(
                   senderName: message.senderName,
