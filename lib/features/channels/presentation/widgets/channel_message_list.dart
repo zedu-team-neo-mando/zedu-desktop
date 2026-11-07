@@ -75,7 +75,7 @@ class ChannelMessageList extends ConsumerWidget {
       itemCount: messages.length,
       itemBuilder: (context, index) {
         final message = messages[index];
-        return ChannelMessageTile(
+        final tile = ChannelMessageTile(
           message: message,
           onRetry: message.id != null
               ? () => ref
@@ -83,7 +83,105 @@ class ChannelMessageList extends ConsumerWidget {
                     .retryMessage(message.id!)
               : null,
         );
+        // Newest first, so the next index is the older neighbour. A day
+        // starts at the oldest message or where the older one is another day.
+        final time = message.createdAt;
+        final isOldest = index == messages.length - 1;
+        final olderTime = isOldest ? null : messages[index + 1].createdAt;
+        final startsDay =
+            time != null &&
+            (isOldest ||
+                (olderTime != null && !DateUtils.isSameDay(time, olderTime)));
+        if (!startsDay) return tile;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ChannelDayDivider(label: channelDayLabel(time)),
+            tile,
+          ],
+        );
       },
+    );
+  }
+}
+
+const _weekdays = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+];
+
+const _months = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+/// The label of the divider above a day's first message: "Today",
+/// "Yesterday", the weekday within the last week, otherwise the date, with
+/// the year only when it isn't this year.
+String channelDayLabel(DateTime day, {DateTime? now}) {
+  final today = now ?? DateTime.now();
+  // Whole days between the calendar dates, unaffected by DST changes.
+  final daysAgo = DateTime.utc(
+    today.year,
+    today.month,
+    today.day,
+  ).difference(DateTime.utc(day.year, day.month, day.day)).inDays;
+  if (daysAgo == 0) return 'Today';
+  if (daysAgo == 1) return 'Yesterday';
+  final weekday = _weekdays[day.weekday - 1];
+  if (daysAgo > 1 && daysAgo < 7) return weekday;
+  final date = '$weekday, ${_months[day.month - 1]} ${day.day}';
+  return day.year == today.year ? date : '$date, ${day.year}';
+}
+
+/// A line with the day's label, above the first message of each day.
+class ChannelDayDivider extends StatelessWidget {
+  const ChannelDayDivider({super.key, required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 16),
+      child: Semantics(
+        header: true,
+        child: Row(
+          children: [
+            Expanded(child: Divider(color: colors.divider)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: colors.textSecondary,
+                ),
+              ),
+            ),
+            Expanded(child: Divider(color: colors.divider)),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -144,9 +242,10 @@ class ChannelMessageTile extends StatelessWidget {
                 const SizedBox(height: 4),
                 MessageLinkScope(
                   builder: (context, links) => SelectableText.rich(
-                    links.span(
+                    buildInlineMarkdownSpan(
                       message.text,
                       TextStyle(fontSize: 15, color: colors.textPrimary),
+                      plainText: links.span,
                     ),
                   ),
                 ),
