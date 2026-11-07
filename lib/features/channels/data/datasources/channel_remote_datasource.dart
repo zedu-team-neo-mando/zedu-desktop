@@ -34,6 +34,9 @@ abstract class ChannelRemoteDataSource {
   /// The latest messages of a channel, newest first.
   Future<List<ChannelMessage>> fetchChannelMessages(String channelId);
 
+  /// The messages pinned in the channel.
+  Future<List<PinnedMessage>> fetchPinnedMessages(String channelId);
+
   /// Replaces the text of the message with [threadId] in [channelId].
   Future<void> editChannelMessage({
     required String channelId,
@@ -279,6 +282,20 @@ class ChannelRemoteDataSourceImpl implements ChannelRemoteDataSource {
     return (data as List)
         .cast<Map<String, dynamic>>()
         .map(ChannelMessage.fromJson)
+        .toList();
+  }
+
+  @override
+  Future<List<PinnedMessage>> fetchPinnedMessages(String channelId) async {
+    final response = await apiBaseService.get<Map<String, dynamic>>(
+      path: '/channels/pin/$channelId',
+    );
+    final data = response.data['data'];
+    if (data == null) return const [];
+    // A wrong shape throws, so the dialog shows its retry state.
+    return (data as List)
+        .cast<Map<String, dynamic>>()
+        .map(PinnedMessage.fromJson)
         .toList();
   }
 

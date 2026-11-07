@@ -64,6 +64,16 @@ class _ArchivingChannelRepository extends _EmptyChannelRepository {
       const Success(<Channel>[]);
 }
 
+/// Answers the pinned messages of every channel.
+class _PinningChannelRepository extends _EmptyChannelRepository {
+  @override
+  Future<Result<List<PinnedMessage>>> fetchPinnedMessages(
+    String channelId,
+  ) async => const Success([
+    PinnedMessage(id: 'm1', senderName: 'Ada', text: 'Release is on Friday'),
+  ]);
+}
+
 class FakeSecureStorageService extends Fake implements SecureStorageService {
   final _values = <String, String>{};
 
@@ -421,6 +431,28 @@ void main() {
         );
         expect(find.text('# random'), findsOneWidget);
         await tester.pump(const Duration(seconds: 5));
+      },
+    );
+
+    testWidgets(
+      'the header icon opens the channel pinned messages (Ziki #17)',
+      (tester) async {
+        await pumpSidebarAndChat(
+          tester,
+          repository: _PinningChannelRepository(),
+        );
+        await tester.tap(find.text('random'));
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const ValueKey('channel-pinned-messages')));
+        await tester.pumpAndSettle();
+
+        expect(find.text('#random pinned messages'), findsOneWidget);
+        expect(find.text('Release is on Friday'), findsOneWidget);
+
+        await tester.tap(find.text('Close'));
+        await tester.pumpAndSettle();
+        expect(find.text('#random pinned messages'), findsNothing);
       },
     );
   });

@@ -531,6 +531,18 @@ class HomeChatArea extends ConsumerWidget {
               ],
             ),
           ),
+          if (channel != null) ...[
+            IconButton(
+              key: const ValueKey('channel-pinned-messages'),
+              tooltip: 'Pinned messages',
+              icon: Icon(Icons.push_pin_outlined, color: colors.textPrimary),
+              onPressed: () => showDialog<void>(
+                context: context,
+                builder: (_) => ChannelPinnedMessagesDialog(channel: channel),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
           _HeaderAction(icon: Icons.headphones_outlined, label: 'Start Buzz'),
           const SizedBox(width: 12),
           CircleAvatar(

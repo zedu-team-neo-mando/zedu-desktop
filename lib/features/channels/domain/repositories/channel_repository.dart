@@ -32,6 +32,9 @@ abstract class ChannelRepository {
 
   /// The latest messages of a channel, newest first.
   Future<Result<List<ChannelMessage>>> fetchChannelMessages(String channelId);
+
+  /// The messages pinned in the channel.
+  Future<Result<List<PinnedMessage>>> fetchPinnedMessages(String channelId);
   Future<Result<void>> editChannelMessage({
     required String channelId,
     required String threadId,
