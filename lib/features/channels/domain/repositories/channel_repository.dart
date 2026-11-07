@@ -29,6 +29,12 @@ abstract class ChannelRepository {
     required String orgId,
     required String channelId,
   });
+
+  /// Starts exporting the channel's history (or returns the running export).
+  Future<Result<ChannelExport>> startChannelExport(String channelId);
+
+  /// The latest export of the channel's history for the current user.
+  Future<Result<ChannelExport>> fetchChannelExportStatus(String channelId);
   Future<Result<List<String>>> fetchOrganisationMemberIds(String orgId);
   Future<Result<List<String>>> fetchChannelMemberIds(String channelId);
   Future<Result<List<DmParticipant>>> fetchChannelMembers(String channelId);
@@ -37,8 +43,11 @@ abstract class ChannelRepository {
     required List<String> userIds,
   });
 
-  /// The latest messages of a channel, newest first.
-  Future<Result<List<ChannelMessage>>> fetchChannelMessages(String channelId);
+  /// One page of a channel's messages, newest first. Page 1 is the newest.
+  Future<Result<ChannelMessagePage>> fetchChannelMessages(
+    String channelId, {
+    int page = 1,
+  });
   Future<Result<void>> editChannelMessage({
     required String channelId,
     required String threadId,
@@ -47,5 +56,19 @@ abstract class ChannelRepository {
   Future<Result<void>> deleteChannelMessage({
     required String channelId,
     required String threadId,
+  });
+
+  /// Usernames of the users who reacted with [reactionId] on [threadId].
+  Future<Result<List<String>>> fetchReactionUsers({
+    required String reactionId,
+    required String threadId,
+  });
+
+  /// Adds the current user's [emoji] reaction to [threadId], or removes it
+  /// if they have already reacted. Returns whether the user reacted now.
+  Future<Result<bool>> toggleReaction({
+    required String channelId,
+    required String threadId,
+    required String emoji,
   });
 }
