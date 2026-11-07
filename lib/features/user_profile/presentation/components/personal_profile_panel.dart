@@ -160,7 +160,17 @@ class PersonalProfilePanel extends ConsumerWidget {
                   const SizedBox(height: 4),
 
                   // Time icon
-                  Icon(Icons.access_time, size: 14, color: colors.textHint),
+Row(
+  mainAxisSize: MainAxisSize.min,
+  children: [
+    Icon(Icons.access_time, size: 14, color: colors.textHint),
+    const SizedBox(width: 4),
+    Text(
+      _localTimeLabel(),
+      style: context.textTheme.bodySmall?.copyWith(color: colors.textHint),
+    ),
+  ],
+),
                   const SizedBox(height: 16),
 
                   // Your own profile: no Favourite (that's for other people).
@@ -416,4 +426,11 @@ class _ContactRow extends StatelessWidget {
       ],
     );
   }
+}
+String _localTimeLabel() {
+  final now = DateTime.now();
+  final hour = now.hour % 12 == 0 ? 12 : now.hour % 12;
+  final minute = now.minute.toString().padLeft(2, '0');
+  final period = now.hour >= 12 ? 'PM' : 'AM';
+  return '$hour:$minute $period local time';
 }
