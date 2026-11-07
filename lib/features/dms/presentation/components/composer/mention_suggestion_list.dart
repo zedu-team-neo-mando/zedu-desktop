@@ -125,25 +125,6 @@ class MentionSuggestionList extends StatelessWidget {
                       ),
                     ),
                   ),
-                                  ),
-                                ),
-                                if (p.email.isNotEmpty)
-                                  Text(
-                                    p.email,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: colors.textHint,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                 );
               },
             ),

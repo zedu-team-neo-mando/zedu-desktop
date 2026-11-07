@@ -14,6 +14,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
   final List<TeamMember> _selectedMembers = [];
   bool _isLoading = false;
   String? _errorMessage;
+  final bool _touched = false;
 
   // Filtered members list
   List<TeamMember> _filteredMembers = [];

@@ -340,10 +340,6 @@ class _NavigationGroupLabel extends StatelessWidget {
           ),
         ),
       ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
