@@ -521,13 +521,12 @@ class UserProfileRemoteDataSourceImpl implements UserProfileRemoteDataSource {
         name: email.split('@').first,
       );
     }
-    return TeamMemberModel(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      email: email,
-      role: role,
-      dateJoined: 'Pending',
-      status: TeamMemberStatus.pending,
-      name: email.split('@').first,
+    // A successful HTTP response can still contain rejected/duplicate emails.
+    // Only announce an invitation when the server confirms it in invitations.
+    throw const ApiFailure(
+      message:
+          'The server did not confirm this invitation. Refresh invitations before retrying.',
+      kind: ApiFailureKind.client,
     );
   }
 
