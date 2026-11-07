@@ -69,7 +69,8 @@ class _AppSidebarRailState extends ConsumerState<AppSidebarRail> {
       ),
       child: Column(
         children: [
-          // Short windows scroll the rail rather than overflowing it.
+          // The nav items scroll in a short window instead of overflowing
+          // into the bottom icons.
           Expanded(
             child: SingleChildScrollView(
               child: Column(
@@ -112,6 +113,23 @@ class _AppSidebarRailState extends ConsumerState<AppSidebarRail> {
                   _BuzzRailItem(
                     isActive: activeType == HomeSidebarType.buzz,
                     onTap: () => select(HomeSidebarType.buzz),
+                  ),
+                  _RailNavItem(
+                    icon: Icons.apartment_outlined,
+                    label: 'Office',
+                    isActive: activeType == HomeSidebarType.office,
+                    onTap: () {
+                      if (OfficeView.isSupported) {
+                        select(HomeSidebarType.office);
+                        return;
+                      }
+                      // No embedded WebView here; the browser signs in to Office
+                      // the web way.
+                      launchUrl(
+                        Uri.parse(kOfficeUrl),
+                        mode: LaunchMode.externalApplication,
+                      );
+                    },
                   ),
                 ],
               ),
