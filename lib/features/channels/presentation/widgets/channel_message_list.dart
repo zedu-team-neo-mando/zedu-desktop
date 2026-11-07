@@ -160,10 +160,10 @@ class _ChannelMessageListState extends ConsumerState<ChannelMessageList> {
         final tile = ChannelMessageTile(
           message: message,
           saveAction:
-              message.status == null && (message.threadId ?? message.id) != null
+              message.status == null && message.id != null
               ? SaveLaterButton(
                   channelId: channelId,
-                  threadId: message.threadId ?? message.id!,
+                  threadId: message.id!,
                 )
               : null,
           onRetry: message.id != null
@@ -296,7 +296,6 @@ class ChannelMessageTile extends StatelessWidget {
                   ),
                 ),
                 if (saveAction != null) saveAction!,
-                ),
                 const SizedBox(height: 4),
                 ReportMessageMenu(
                   senderName: message.senderName,

@@ -113,7 +113,7 @@ class _LaterBodyState extends ConsumerState<LaterBody> {
                                     ? 'Original conversation unavailable. You can remove this saved item.'
                                     : item.preview.isEmpty
                                     ? 'Open to view the original message'
-                                    : threadText(item.preview),
+                                    : item.preview,
                               ].join(' · '),
                               maxLines: 3,
                               overflow: TextOverflow.ellipsis,
@@ -223,10 +223,8 @@ class _SavedMessageDialogState extends ConsumerState<_SavedMessageDialog> {
                   }
                   return SingleChildScrollView(
                     child: SelectableText(
-                      threadText(
-                        (message['message'] ?? message['content'] ?? '')
-                            .toString(),
-                      ),
+                      (message['message'] ?? message['content'] ?? '')
+                          .toString(),
                     ),
                   );
                 },

@@ -98,6 +98,7 @@ class _AppSidebarRailState extends ConsumerState<AppSidebarRail> {
             isActive: widget.laterSelected,
             onTap: () => context.go(AppRouter.later),
           ),
+          _RailNavItem(
             icon: Icons.folder_open_outlined,
             label: 'Files',
             isActive: activeType == HomeSidebarType.files,
