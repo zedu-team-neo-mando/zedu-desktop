@@ -575,6 +575,106 @@ class UserProfileNotifier extends Notifier<UserProfileState> {
     }
   }
 
+  /// Sequential requests bound concurrency and preserve per-address outcomes.
+  /// A null outcome means success. The backend remains authoritative for access.
+  Future<Map<String, String?>> inviteMembers({
+    required List<String> emails,
+    required String role,
+    required String orgId,
+  }) async {
+    final userId = ref.read(authNotifierProvider).user?.id;
+    bool current() =>
+        ref.mounted &&
+        userId != null &&
+        ref.read(authNotifierProvider).user?.id == userId &&
+        ref.read(workspaceProvider).selectedWorkspace?.id == orgId;
+    if (!current() || state.isSaving) {
+      return {
+        for (final email in emails)
+          email: 'Workspace changed or a save is in progress.',
+      };
+    }
+    state = state.copyWith(
+      isSaving: true,
+      clearError: true,
+      clearSuccess: true,
+    );
+    final outcomes = <String, String?>{};
+    try {
+      final api = locator<ApiBaseService>();
+      final response = await api.get<Map<String, dynamic>>(
+        path: '/organisations/$orgId',
+      );
+      final org = response.data['data'];
+      final userRole = org is Map ? org['user_role'] : null;
+      final roleName =
+          (userRole is Map
+                  ? userRole['role_name']
+                  : org is Map
+                  ? org['role']
+                  : null)
+              ?.toString()
+              .toLowerCase();
+      final permissions = [
+        if (userRole is Map && userRole['permissions'] is List)
+          ...userRole['permissions'] as List,
+      ];
+      final allowed =
+          ['owner', 'administrator', 'manager'].contains(roleName) ||
+          permissions.contains('invite:members') ||
+          permissions.contains('can_invite_members');
+      if (!allowed) {
+        return {
+          for (final email in emails)
+            email: 'You do not have permission to invite members.',
+        };
+      }
+      final roles = await _fetchOrganisationRoles(orgId);
+      final resolved = _resolveRoleId(roles, role);
+      final roleId = roles.any((r) => r['id']?.toString() == resolved)
+          ? resolved
+          : null;
+      for (final email in emails.toSet()) {
+        if (!current()) {
+          outcomes[email] =
+              'Workspace changed. This address was not submitted.';
+          continue;
+        }
+        if (!BulkInvitation.valid(email)) {
+          outcomes[email] = 'Invalid email address.';
+          continue;
+        }
+        if (roleId == null) {
+          outcomes[email] =
+              'Could not resolve the selected role. Refresh and try again.';
+          continue;
+        }
+        final result = await _repository.inviteMember(
+          email: email,
+          role: roleId,
+          orgId: orgId,
+        );
+        outcomes[email] = switch (result) {
+          Success<TeamMember>() => null,
+          Failure<TeamMember>() => result.error.friendlyMessage,
+        };
+        if (current() && result is Success<TeamMember>) {
+          state = state.copyWith(
+            teamMembers: [
+              ...state.teamMembers.where(
+                (m) => m.email.toLowerCase() != email.toLowerCase(),
+              ),
+              result.value.copyWith(role: role),
+            ],
+          );
+        }
+      }
+      return outcomes;
+    } finally {
+      if (ref.mounted) state = state.copyWith(isSaving: false);
+    }
+  }
+
   Future<void> updateMember(TeamMember member) async {
     state = state.copyWith(
       isSaving: true,
