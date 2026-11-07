@@ -54,7 +54,9 @@ class _AuthDeepLinkListenerState extends ConsumerState<AuthDeepLinkListener> {
 
     try {
       AppLogger.i('Processing magic link deep link', tag: _tag);
-      await ref.read(authNotifierProvider.notifier).verifyMagicLink(token: token);
+      await ref
+          .read(authNotifierProvider.notifier)
+          .verifyMagicLink(token: token);
 
       if (!mounted) return;
 
