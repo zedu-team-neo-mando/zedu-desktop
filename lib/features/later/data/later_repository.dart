@@ -105,8 +105,9 @@ final savedMessagesProvider = FutureProvider<List<SavedMessage>>((ref) {
   final orgId = ref.watch(
     workspaceProvider.select((s) => s.selectedWorkspace?.id),
   );
+  if (orgId == null) return Future.value([]);
   final userId = ref.watch(authNotifierProvider.select((s) => s.user?.id));
-  return orgId == null || userId == null
+  return userId == null
       ? Future.value([])
       : ref.watch(laterRepositoryProvider).load(orgId);
 }, retry: (_, _) => null);
