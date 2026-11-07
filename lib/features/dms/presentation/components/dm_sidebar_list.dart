@@ -133,7 +133,9 @@ class _DmSidebarListState extends ConsumerState<DmSidebarList> {
                         : ref.watch(dmSearchResultsProvider(_debouncedQuery)))
                     .when(
                       loading: () => Center(
-                        child: CircularProgressIndicator(color: colors.onPrimary),
+                        child: CircularProgressIndicator(
+                          color: colors.onPrimary,
+                        ),
                       ),
                       error: (err, stack) => Center(
                         child: Text(
