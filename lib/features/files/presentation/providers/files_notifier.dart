@@ -36,6 +36,11 @@ class FilesNotifier extends Notifier<FilesState> {
     state = _with(view: view, folderPath: const [], page: 1, folderPage: 1);
   }
 
+  /// Shows [view] while keeping the open folder, so uploads stay visible.
+  void switchViewKeepingFolder(FilesScope view) {
+    state = _with(view: view, folderPath: state.folderPath, page: 1, folderPage: 1);
+  }
+
   /// Opens [folder] inside the current one and shows its files.
   void openFolder(FileFolder folder) {
     state = _with(
@@ -250,8 +255,9 @@ class FilesActionsNotifier extends Notifier<FilesActionsState> {
     if (!workspaceChanged && uploaded > 0) {
       final files = ref.read(filesProvider.notifier);
       if (ref.read(filesProvider).view == FilesScope.trash) {
-        // Trash has no folders, so All files is the only place uploads can show.
-        files.selectView(FilesScope.all);
+        // Trash has no folders, so All files is the only place uploads can
+        // show; keep the open folder so the uploaded file is visible.
+        files.switchViewKeepingFolder(FilesScope.all);
       }
       files
         ..setTab(FilesTab.files)

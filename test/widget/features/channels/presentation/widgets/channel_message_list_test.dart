@@ -5,6 +5,28 @@ import 'package:zedu/features/features.dart';
 
 class MockChannelRepository extends Mock implements ChannelRepository {}
 
+class _FakeAuthNotifier extends AuthNotifier {
+  @override
+  AuthState build() => AuthState(
+    status: AuthStatus.authenticated,
+    user: User(
+      id: 'user-1',
+      firstName: 'Test',
+      lastName: 'User',
+      email: 'test@example.com',
+      phone: '',
+      username: 'testuser',
+      isVerified: true,
+      isOnboarded: true,
+      createdAt: DateTime(2026),
+      currentOrg: 'org-1',
+      currentOrganisationSlug: 'test-org',
+      avatarUrl: '',
+      defaultAvatarUrl: '',
+    ),
+  );
+}
+
 class FakeChatHistoryNotifier extends ChangeNotifier
     implements ChatHistoryNotifier {
   FakeChatHistoryNotifier(this.channelId);
@@ -35,6 +57,11 @@ class FakeChatHistoryNotifier extends ChangeNotifier
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+Success<ChannelMessagePage> _page(
+  List<ChannelMessage> messages, {
+  bool hasMore = false,
+}) => Success(ChannelMessagePage(messages: messages, hasMore: hasMore));
+
 void main() {
   late MockChannelRepository repository;
   late FakeChatHistoryNotifier fakeChatHistory;
@@ -44,44 +71,59 @@ void main() {
     fakeChatHistory = FakeChatHistoryNotifier('ch-1');
   });
 
+  void stubPage(int page, Result<ChannelMessagePage> result) {
+    when(
+      () => repository.fetchChannelMessages('ch-1', page: page),
+    ).thenAnswer((_) async => result);
+  }
+
   Future<void> pumpList(
-    WidgetTester tester,
-    Result<List<ChannelMessage>> r, {
+    WidgetTester tester, [
+    Result<List<ChannelMessage>>? legacy,
     FakeChatHistoryNotifier? chatNotifier,
-  }) {
-    when(() => repository.fetchChannelMessages('ch-1'))
-        .thenAnswer((_) async => r);
-    return tester
-        .pumpWidget(
-          ProviderScope(
-            overrides: [
-              channelRepositoryProvider.overrideWithValue(repository),
-              chatHistoryProvider.overrideWith(
-                (ref, channelId) => chatNotifier ?? fakeChatHistory,
-              ),
-            ],
-            retry: (_, _) => null,
-            child: buildTestMaterialApp(
-              const Scaffold(
-                body: ChannelMessageList(
-                  channelId: 'ch-1',
-                  empty: Text('Welcome to #general'),
-                ),
-              ),
+  ]) async {
+    if (legacy != null) {
+      stubPage(
+        1,
+        switch (legacy) {
+          Success<List<ChannelMessage>>(:final value) =>
+            Success(ChannelMessagePage(messages: value, hasMore: false)),
+          Failure<List<ChannelMessage>>(:final error) =>
+            Failure<ChannelMessagePage>(error),
+        },
+      );
+    }
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          channelRepositoryProvider.overrideWithValue(repository),
+          chatHistoryProvider.overrideWith(
+            (ref, channelId) => chatNotifier ?? fakeChatHistory,
+          ),
+        ],
+        retry: (_, _) => null,
+        child: buildTestMaterialApp(
+          const Scaffold(
+            body: ChannelMessageList(
+              channelId: 'ch-1',
+              empty: Text('Welcome to #general'),
             ),
           ),
-        )
-        .then((_) => tester.pumpAndSettle());
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
   }
 
   testWidgets('shows the messages, newest at the bottom', (tester) async {
-    await pumpList(
-      tester,
-      const Success([
-        ChannelMessage(senderName: 'gold', text: 'newest'),
-        ChannelMessage(senderName: 'Ada', text: 'oldest'),
+    stubPage(
+      1,
+      _page(const [
+        ChannelMessage(id: '2', senderName: 'gold', text: 'newest'),
+        ChannelMessage(id: '1', senderName: 'Ada', text: 'oldest'),
       ]),
     );
+    await pumpList(tester);
 
     expect(find.text('Welcome to #general'), findsNothing);
     expect(
@@ -114,24 +156,76 @@ void main() {
   });
 
   testWidgets('shows the welcome screen when empty', (tester) async {
-    await pumpList(tester, const Success(<ChannelMessage>[]));
+    stubPage(1, _page(const <ChannelMessage>[]));
+    await pumpList(tester);
 
     expect(find.text('Welcome to #general'), findsOneWidget);
   });
 
   testWidgets('offers a retry when loading fails', (tester) async {
-    await pumpList(tester, const Failure(ApiFailure(message: 'boom')));
+    stubPage(1, const Failure(ApiFailure(message: 'boom')));
+    await pumpList(tester);
 
     expect(find.text("Couldn't load messages. Retry"), findsOneWidget);
   });
 
+  testWidgets('loads older messages when the top of the list shows', (
+    tester,
+  ) async {
+    stubPage(
+      1,
+      _page(const [
+        ChannelMessage(id: '2', senderName: 'gold', text: 'newest'),
+      ], hasMore: true),
+    );
+    stubPage(
+      2,
+      _page(const [ChannelMessage(id: '1', senderName: 'Ada', text: 'oldest')]),
+    );
+    await pumpList(tester);
+
+    expect(find.text('newest'), findsOneWidget);
+    expect(find.text('oldest'), findsOneWidget);
+    verify(() => repository.fetchChannelMessages('ch-1', page: 2)).called(1);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
+  testWidgets('shows an inline retry when an older page fails', (tester) async {
+    stubPage(
+      1,
+      _page(const [
+        ChannelMessage(id: '2', senderName: 'gold', text: 'newest'),
+      ], hasMore: true),
+    );
+    stubPage(2, const Failure(ApiFailure(message: 'boom')));
+    await pumpList(tester);
+
+    // The messages stay, and the failure is not retried on its own.
+    expect(find.text('newest'), findsOneWidget);
+    expect(find.text("Couldn't load older messages. Retry"), findsOneWidget);
+    verify(() => repository.fetchChannelMessages('ch-1', page: 2)).called(1);
+
+    stubPage(
+      2,
+      _page(const [ChannelMessage(id: '1', senderName: 'Ada', text: 'oldest')]),
+    );
+    await tester.tap(find.text("Couldn't load older messages. Retry"));
+    await tester.pumpAndSettle();
+
+    expect(find.text('oldest'), findsOneWidget);
+    expect(find.text("Couldn't load older messages. Retry"), findsNothing);
+  });
+
   testWidgets(
-    'renders placeholder initial for empty senderName without crashing',
+    'renders a placeholder initial for an empty senderName without crashing',
     (tester) async {
-      await pumpList(
-        tester,
-        const Success([ChannelMessage(senderName: '', text: 'empty sender')]),
+      stubPage(
+        1,
+        _page(const [
+          ChannelMessage(id: '1', senderName: '', text: 'empty sender'),
+        ]),
       );
+      await pumpList(tester);
 
       expect(find.text('?'), findsOneWidget);
       expect(find.text('empty sender'), findsOneWidget);
@@ -507,5 +601,136 @@ void main() {
       await tester.pump(const Duration(seconds: 5));
       await tester.pumpAndSettle();
     });
+  });
+
+  const reactedMessage = ChannelMessage(
+    id: 'm-1',
+    senderName: 'Ada',
+    text: 'reacted message',
+    reactions: [
+      ChannelReaction(emoji: '👍', reactionId: 'r-1', count: 3),
+      ChannelReaction(emoji: '🔥', reactionId: 'r-2', count: 1),
+    ],
+  );
+
+  void stubReactionUsers() {
+    when(
+      () => repository.fetchReactionUsers(
+        reactionId: any(named: 'reactionId'),
+        threadId: any(named: 'threadId'),
+      ),
+    ).thenAnswer((_) async => const Success(<String>[]));
+  }
+
+  testWidgets('renders a pill with the count for each reaction (#2684)', (
+    tester,
+  ) async {
+    stubReactionUsers();
+
+    await pumpList(tester, const Success([reactedMessage]));
+
+    expect(find.text('👍'), findsOneWidget);
+    expect(find.text('3'), findsOneWidget);
+    expect(find.text('🔥'), findsOneWidget);
+    expect(find.text('1'), findsOneWidget);
+  });
+
+  testWidgets(
+    'tapping a pill toggles the reaction and refreshes the history (#2684)',
+    (tester) async {
+      stubReactionUsers();
+      when(
+        () => repository.toggleReaction(
+          channelId: 'ch-1',
+          threadId: 'm-1',
+          emoji: '👍',
+        ),
+      ).thenAnswer((_) async => const Success(true));
+
+      await pumpList(tester, const Success([reactedMessage]));
+
+      await tester.tap(find.text('👍'));
+      await tester.pumpAndSettle();
+
+      verify(
+        () => repository.toggleReaction(
+          channelId: 'ch-1',
+          threadId: 'm-1',
+          emoji: '👍',
+        ),
+      ).called(1);
+    },
+  );
+
+  testWidgets('highlights only the pills the user has reacted with (#2684)', (
+    tester,
+  ) async {
+    when(
+      () => repository.fetchReactionUsers(reactionId: 'r-1', threadId: 'm-1'),
+    ).thenAnswer((_) async => const Success(['Ada', 'testuser']));
+    when(
+      () => repository.fetchReactionUsers(reactionId: 'r-2', threadId: 'm-1'),
+    ).thenAnswer((_) async => const Success([]));
+
+    await pumpList(tester, const Success([reactedMessage]));
+
+    final colors = tester.element(find.text('👍')).colors;
+    final thumbsPill = tester.widget<Material>(
+      find.ancestor(of: find.text('👍'), matching: find.byType(Material)).first,
+    );
+    final firePill = tester.widget<Material>(
+      find.ancestor(of: find.text('🔥'), matching: find.byType(Material)).first,
+    );
+
+    expect(thumbsPill.color, colors.primary);
+    expect(firePill.color, colors.background);
+  });
+
+  testWidgets('the add-reaction button opens the picker and reacts (#2684)', (
+    tester,
+  ) async {
+    stubReactionUsers();
+    when(
+      () => repository.toggleReaction(
+        channelId: 'ch-1',
+        threadId: 'm-1',
+        emoji: '😀',
+      ),
+    ).thenAnswer((_) async => const Success(true));
+
+    await pumpList(tester, const Success([reactedMessage]));
+
+    await tester.tap(find.byIcon(Icons.add_reaction_outlined));
+    await tester.pumpAndSettle();
+    expect(find.text('Emoji'), findsOneWidget);
+
+    await tester.tap(find.text('😀'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Emoji'), findsNothing);
+    verify(
+      () => repository.toggleReaction(
+        channelId: 'ch-1',
+        threadId: 'm-1',
+        emoji: '😀',
+      ),
+    ).called(1);
+  });
+
+  testWidgets('pending messages show no reactions row (#2684)', (tester) async {
+    fakeChatHistory.messages = [
+      {
+        'id': 'temp-1',
+        'content': 'Optimistic message',
+        'channel_id': 'ch-1',
+        'status': 'sending',
+        'created_at': DateTime.now().toIso8601String(),
+      },
+    ];
+
+    await pumpList(tester, const Success(<ChannelMessage>[]));
+
+    expect(find.text('Optimistic message'), findsOneWidget);
+    expect(find.byIcon(Icons.add_reaction_outlined), findsNothing);
   });
 }

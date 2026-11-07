@@ -79,6 +79,16 @@ class _FilesSearchFieldState extends State<FilesSearchField> {
   Timer? _debounce;
 
   @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_onControllerChanged);
+  }
+
+  void _onControllerChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   void didUpdateWidget(FilesSearchField oldWidget) {
     super.didUpdateWidget(oldWidget);
     // [value] catching up with what was typed must not disturb further typing.
@@ -93,6 +103,7 @@ class _FilesSearchFieldState extends State<FilesSearchField> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _controller.removeListener(_onControllerChanged);
     _controller.dispose();
     super.dispose();
   }
@@ -105,6 +116,12 @@ class _FilesSearchFieldState extends State<FilesSearchField> {
   void _onChanged(String value) {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 400), () => _report(value));
+  }
+
+  void _clear() {
+    _debounce?.cancel();
+    _controller.clear();
+    _report('');
   }
 
   @override
@@ -132,6 +149,14 @@ class _FilesSearchFieldState extends State<FilesSearchField> {
             color: colors.textHint,
           ),
           prefixIcon: Icon(Icons.search, color: colors.textHint, size: 18),
+          suffixIcon: _controller.text.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: 'Clear search',
+                  icon: Icon(Icons.close, color: colors.textHint, size: 16),
+                  splashRadius: 16,
+                  onPressed: _clear,
+                ),
           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),

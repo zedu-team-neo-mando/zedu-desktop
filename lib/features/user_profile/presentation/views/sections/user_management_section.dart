@@ -106,6 +106,18 @@ class _UserManagementSectionState extends State<UserManagementSection> {
             onPressed: () => _showInviteDialog(context, widget.onInvite),
           ),
         ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: widget.isSaving
+              ? null
+              : () => showDialog<void>(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (_) => const BulkInviteDialog(),
+                ),
+          icon: const Icon(Icons.group_add_outlined),
+          label: const Text('Invite multiple people'),
+        ),
         const SizedBox(height: 34),
         Row(
           children: [

@@ -23,6 +23,27 @@ class BuzzMeetingsNotifier extends Notifier<BuzzMeetingAction> {
     );
   }
 
+  /// The page to open for what was typed in Join, or a failure with a message
+  /// for the person. A pasted link keeps its own organisation; a bare code
+  /// joins in the current one.
+  Result<Uri> joinLink(String input) {
+    if (isBuzzMeetingAddress(input)) {
+      final link = buzzMeetingUrlFromLink(
+        input,
+        webBaseUrl: ref.read(buzzConfigProvider).webBaseUrl,
+      );
+      return link == null
+          ? const Failure(
+              ApiFailure(message: "That isn't a Zedu meeting link."),
+            )
+          : Success(link);
+    }
+    final link = linkFor(buzzMeetingCode(input));
+    return link == null
+        ? const Failure(ApiFailure(message: 'Sign in again to join a meeting.'))
+        : Success(link);
+  }
+
   /// Creates a meeting and returns its link, or a failure with a message
   /// for the person. [startNow] links straight into the meeting.
   Future<Result<Uri>> create({required bool startNow}) async {

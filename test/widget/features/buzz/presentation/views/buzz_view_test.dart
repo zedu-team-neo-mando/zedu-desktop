@@ -67,6 +67,26 @@ void main() {
     expect(join().onPressed, isNotNull);
   });
 
+  testWidgets('Join says so when a pasted link is not a Zedu meeting', (
+    tester,
+  ) async {
+    await _pump(tester, _FakeRepository(const Success('abc')));
+
+    await tester.enterText(
+      find.byType(TextField),
+      'https://meet.google.com/abc-defg-hij',
+    );
+    await tester.pump();
+    await tester.tap(find.widgetWithText(TextButton, 'Join'));
+    await tester.pump();
+
+    expect(find.text("That isn't a Zedu meeting link."), findsOneWidget);
+
+    // The toast dismisses itself on a timer; let it fire before the test ends.
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('a meeting for later shows its link to copy', (tester) async {
     final repository = _FakeRepository(const Success('abc-defg-hij'));
     await _pump(tester, repository);

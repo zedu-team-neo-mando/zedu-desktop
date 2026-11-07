@@ -115,12 +115,17 @@ class _SetStatusDialogState extends ConsumerState<SetStatusDialog> {
   Widget build(BuildContext context) {
     final colors = context.colors;
 
-    return Dialog(
-      backgroundColor: colors.background,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: SizedBox(
-        width: 520,
-        child: SingleChildScrollView(
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.escape): () =>
+            Navigator.of(context).pop(),
+      },
+      child: Dialog(
+        backgroundColor: colors.background,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: SizedBox(
+          width: 520,
+          child: SingleChildScrollView(
           padding: const EdgeInsets.all(28),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -210,6 +215,10 @@ class _SetStatusDialogState extends ConsumerState<SetStatusDialog> {
                           color: colors.textPrimary,
                         ),
                         maxLength: 100,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) {
+                          if (!_isSaving) _save();
+                        },
                         // Rebuild so the clear button and the selected suggestion follow the text.
                         onChanged: (_) => setState(() {}),
                         buildCounter:
@@ -354,6 +363,7 @@ class _SetStatusDialogState extends ConsumerState<SetStatusDialog> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

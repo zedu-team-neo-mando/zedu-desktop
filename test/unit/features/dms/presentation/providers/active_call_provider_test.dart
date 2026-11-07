@@ -626,4 +626,57 @@ void main() {
 
     expect(media.calls, contains('dispose'));
   });
+
+  group('notifyListeners (#2594)', () {
+    test(
+      'one override both rings a coming call and stays silent after dispose',
+      () async {
+        final ringtone = _MergeGuardRingtone();
+        final container = ProviderContainer(
+          overrides: [
+            callRingtoneProvider.overrideWithValue(ringtone),
+            buzzRepositoryProvider.overrideWithValue(FakeBuzzCallRepository()),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        final notifier = container.read(activeCallProvider);
+        var notifications = 0;
+        notifier.addListener(() => notifications++);
+
+        notifier.receiveIncomingCall(
+          buzzId: 'buzz-1',
+          remoteUserId: 'u-1',
+          remoteUserName: 'Ada',
+          channelId: 'c-1',
+        );
+        expect(ringtone.calls, ['start']);
+        expect(notifications, 1);
+
+        // A second update while still ringing: notified, and it does not re-ring.
+        notifier.setFullPage(true);
+        expect(ringtone.calls, ['start']);
+        expect(notifications, 2);
+
+        notifier.dispose();
+        notifier.setFullPage(false);
+        expect(notifications, 2);
+        // dispose() stops the ring it holds; the update after it adds nothing.
+        expect(ringtone.calls, ['start', 'stop']);
+      },
+    );
+  });
+}
+
+class _MergeGuardRingtone implements CallRingtone {
+  final calls = <String>[];
+
+  @override
+  Future<void> start() async => calls.add('start');
+
+  @override
+  Future<void> stop() async => calls.add('stop');
+
+  @override
+  Future<void> dispose() async => calls.add('dispose');
 }

@@ -11,6 +11,8 @@ void main() {
       'created_at': '2026-10-21T05:14:46Z',
     });
 
+    expect(message.id, 't-1');
+    expect(message.dedupeKey, 't-1');
     expect(message.senderName, 'Ada Lovelace');
     expect(message.avatarUrl, 'https://cdn.zedu.chat/a.png');
     expect(message.createdAt, DateTime.utc(2026, 10, 21, 5, 14, 46).toLocal());
@@ -25,10 +27,15 @@ void main() {
           '<p>Hi &amp; welcome</p><div>Line&nbsp;two</div><ul><li>a</li><li>b</li></ul>',
     });
 
+    expect(message.id, isNull);
     expect(message.senderName, 'gold_salam');
     expect(message.avatarUrl, 'https://cdn.zedu.chat/default.png');
     expect(message.text, 'Hi & welcome\nLine two\na\nb');
+
+    expect(message.rawContent, contains('<p>Hi &amp; welcome</p>'));
     expect(message.media, isEmpty);
+    // Without an id, the content identifies the message.
+    expect(message.dedupeKey, contains('gold_salam'));
   });
 
   group('ChannelMessage.fromJson parses media attachments (#2681)', () {
@@ -88,6 +95,44 @@ void main() {
         expect(msg3.media, isEmpty);
       },
     );
+  });
+
+  group('ChannelMessage.fromJson reactions', () {
+    test('maps the reaction list from the thread payload', () {
+      final message = ChannelMessage.fromJson({
+        'reactions': [
+          {'reaction': '👍', 'reaction_id': 'r-1', 'reaction_count': 3},
+          {'reaction': '🔥', 'reaction_id': 'r-2', 'reaction_count': 1},
+        ],
+      });
+
+      expect(message.reactions, hasLength(2));
+      expect(message.reactions[0].emoji, '👍');
+      expect(message.reactions[0].reactionId, 'r-1');
+      expect(message.reactions[0].count, 3);
+      expect(message.reactions[1].emoji, '🔥');
+      expect(message.reactions[1].reactionId, 'r-2');
+      expect(message.reactions[1].count, 1);
+    });
+
+    test('tolerates missing, null, and non-map entries', () {
+      final message = ChannelMessage.fromJson({
+        'reactions': [
+          null,
+          'garbage',
+          {'reaction': '🎉'},
+        ],
+      });
+
+      expect(message.reactions, hasLength(1));
+      expect(message.reactions.single.emoji, '🎉');
+      expect(message.reactions.single.reactionId, '');
+      expect(message.reactions.single.count, 0);
+    });
+
+    test('defaults to no reactions when the field is absent', () {
+      expect(ChannelMessage.fromJson({}).reactions, isEmpty);
+    });
   });
 
   group('ChannelMessage.fromJson decodes HTML entities', () {

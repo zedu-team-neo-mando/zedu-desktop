@@ -36,6 +36,18 @@ List<TeamMember> createMembers(int count) {
 }
 
 void main() {
+  testWidgets('offers bulk invitation alongside the existing member table', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(buildUnderTest(createMembers(2)));
+    await tester.pumpAndSettle();
+    expect(find.text('Invite multiple people'), findsOneWidget);
+    expect(find.text('Members'), findsOneWidget);
+    expect(find.text('Invites'), findsOneWidget);
+  });
+
   group('UserManagementSection role filter (Ziki #2389)', () {
     TeamMember member(String email, String role) => TeamMember(
       id: email,
