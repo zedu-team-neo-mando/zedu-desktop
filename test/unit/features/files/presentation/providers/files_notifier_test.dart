@@ -202,32 +202,39 @@ void main() {
       expect(uploads.read(filesActionsProvider).isUploading, isFalse);
     });
 
-    test('shows the top-level Files tab afterwards', () async {
-      uploads.read(filesProvider.notifier)
-        ..selectView(FilesScope.trash)
-        ..openFolder(_docs)
-        ..setTab(FilesTab.folders);
+    test(
+      'keeps the open folder afterwards so the uploads are visible',
+      () async {
+        uploads.read(filesProvider.notifier)
+          ..selectView(FilesScope.trash)
+          ..openFolder(_docs)
+          ..setTab(FilesTab.folders);
 
-      await uploads.read(filesActionsProvider.notifier).uploadFiles([
-        _file('a.png'),
-      ]);
+        await uploads.read(filesActionsProvider.notifier).uploadFiles([
+          _file('a.png'),
+        ]);
 
-      final state = uploads.read(filesProvider);
-      expect(state.view, FilesScope.all);
-      expect(state.folderPath, isEmpty);
-      expect(state.tab, FilesTab.files);
-    });
+        final state = uploads.read(filesProvider);
+        expect(state.view, FilesScope.all);
+        // The old behaviour jumped to the top level, leaving the user staring at
+        // a folder that looked empty because the file landed at the root.
+        expect(state.folderPath, isNotEmpty);
+        expect(state.folderId, isNotNull);
+        expect(state.tab, FilesTab.files);
+      },
+    );
   });
 }
 
 /// Server pages of ten files, newest first: page 1 holds the newest files and
 /// every later page holds older ones.
-class _PagedRepository implements FilesRepository {
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-
+class _PagedRepository extends Fake implements FilesRepository {
   int totalPages = 1;
   final pages = <int>[];
+
+  @override
+  Future<Result<WorkspaceFileInfo>> fetchFileInfo(String fileId) async =>
+      Success(WorkspaceFileInfo());
 
   @override
   Future<Result<FilesPage>> fetchFiles(FilesQuery query) async {
@@ -260,8 +267,10 @@ class _PagedRepository implements FilesRepository {
   }) async => const Success(FoldersPage(folders: []));
 
   @override
-  Future<Result<WorkspaceFile>> uploadFile(XFile file) async =>
-      Success(WorkspaceFile(id: file.name, name: file.name));
+  Future<Result<WorkspaceFile>> uploadFile(
+    XFile file, {
+    String? parentId,
+  }) async => Success(WorkspaceFile(id: file.name, name: file.name));
 
   @override
   Future<Result<void>> createFolder({
@@ -269,17 +278,69 @@ class _PagedRepository implements FilesRepository {
     required String orgId,
     String? parentId,
   }) async => const Success(null);
+
+  @override
+  Future<Result<void>> downloadFile({
+    required WorkspaceFile file,
+    required String savePath,
+    void Function(double? progress)? onProgress,
+  }) async => const Success(null);
+
+  @override
+  Future<Result<void>> deleteFile(
+    String fileId, {
+    bool permanent = false,
+  }) async => const Success(null);
+
+  @override
+  Future<Result<void>> renameFile(String fileId, String name) async =>
+      const Success(null);
+
+  @override
+  Future<Result<void>> moveFile(String fileId, String folderId) async =>
+      const Success(null);
+
+  @override
+  Future<Result<FileShareResult>> shareFile({
+    required String fileId,
+    required List<String> recipientIds,
+    required FileSharePermission permission,
+    required FileShareAccess access,
+    String note = '',
+  }) async => const Success(FileShareResult());
+
+  @override
+  Future<Result<Uint8List>> fetchFilePreview(
+    WorkspaceFile file,
+    FilePreviewKind kind,
+  ) async => Success(Uint8List(0));
+
+  @override
+  Future<Result<WorkspaceFile>> fetchFileDetails(String fileId) async =>
+      Success(WorkspaceFile(id: fileId, name: fileId));
+
+  @override
+  Future<Result<Set<String>>> fetchPinnedFileIds() async => const Success({});
+
+  @override
+  Future<Result<void>> pinFile(String fileId) async => const Success(null);
+
+  @override
+  Future<Result<void>> unpinFile(String fileId) async => const Success(null);
+
+  @override
+  Future<Result<void>> deleteFolder(String id) async => const Success(null);
 }
 
-class _UploadRepository implements FilesRepository {
-  @override
-  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-
+class _UploadRepository extends Fake implements FilesRepository {
   final uploaded = <String>[];
   ApiFailure? folderError;
 
   @override
-  Future<Result<WorkspaceFile>> uploadFile(XFile file) async {
+  Future<Result<WorkspaceFile>> uploadFile(
+    XFile file, {
+    String? parentId,
+  }) async {
     uploaded.add(file.name);
     return file.name.startsWith('bad')
         ? const Failure(ApiFailure(message: 'too large'))
@@ -345,6 +406,10 @@ class _UploadRepository implements FilesRepository {
       Success(WorkspaceFile(id: fileId, name: fileId));
 
   @override
+  Future<Result<WorkspaceFileInfo>> fetchFileInfo(String fileId) async =>
+      Success(WorkspaceFileInfo());
+
+  @override
   Future<Result<Set<String>>> fetchPinnedFileIds() async => const Success({});
 
   @override
@@ -352,4 +417,7 @@ class _UploadRepository implements FilesRepository {
 
   @override
   Future<Result<void>> unpinFile(String fileId) async => const Success(null);
+
+  @override
+  Future<Result<void>> deleteFolder(String id) async => const Success(null);
 }

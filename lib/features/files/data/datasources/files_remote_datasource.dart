@@ -10,7 +10,7 @@ abstract class FilesRemoteDataSource {
     int page = 1,
   });
 
-  Future<WorkspaceFile> uploadFile(XFile file);
+  Future<WorkspaceFile> uploadFile(XFile file, {String? parentId});
 
   Future<void> createFolder({
     required String name,
@@ -58,6 +58,10 @@ abstract class FilesRemoteDataSource {
 
   /// File [fileId] as `GET /files/file/{id}` reports it now.
   Future<WorkspaceFile> fetchFileDetails(String fileId);
+
+  /// What `GET /files/file/{id}/info` says about the file, including the
+  /// channels it was shared in.
+  Future<WorkspaceFileInfo> fetchFileInfo(String fileId);
 
   /// Ids of the files the user pinned, from `GET /files/favorites`.
   Future<Set<String>> fetchPinnedFileIds();
@@ -158,7 +162,7 @@ class FilesRemoteDataSourceImpl implements FilesRemoteDataSource {
   /// Sends one file as the `files` part, as the web app does. The server
   /// files it at the top level of the user's files.
   @override
-  Future<WorkspaceFile> uploadFile(XFile file) async {
+  Future<WorkspaceFile> uploadFile(XFile file, {String? parentId}) async {
     final mime = file.mimeType;
     final type = mime != null && mime.contains('/')
         ? DioMediaType.parse(mime)
@@ -180,6 +184,10 @@ class FilesRemoteDataSourceImpl implements FilesRemoteDataSource {
                 ),
         ),
       );
+
+    if (parentId != null && parentId.isNotEmpty) {
+      formData.fields.add(MapEntry('folder_id', parentId));
+    }
 
     final response = await apiBaseService.post<Map<String, dynamic>>(
       path: '/files/upload-files',
@@ -335,6 +343,21 @@ class FilesRemoteDataSourceImpl implements FilesRemoteDataSource {
       );
     }
     return WorkspaceFile.fromJson(Map<String, dynamic>.from(data));
+  }
+
+  @override
+  Future<WorkspaceFileInfo> fetchFileInfo(String fileId) async {
+    final path = '/files/file/$fileId/info';
+    final response = await apiBaseService.get<Map<String, dynamic>>(path: path);
+    final data = response.data['data'];
+    if (data is! Map) {
+      throw ApiFailure(
+        message: 'File info missing from the response.',
+        path: path,
+        kind: ApiFailureKind.parsing,
+      );
+    }
+    return WorkspaceFileInfo.fromJson(Map<String, dynamic>.from(data));
   }
 
   @override

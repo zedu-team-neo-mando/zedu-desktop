@@ -36,6 +36,11 @@ class FilesNotifier extends Notifier<FilesState> {
     state = _with(view: view, folderPath: const [], page: 1, folderPage: 1);
   }
 
+  /// Shows [view] while keeping the open folder, so uploads stay visible.
+  void switchViewKeepingFolder(FilesScope view) {
+    state = _with(view: view, folderPath: state.folderPath, page: 1, folderPage: 1);
+  }
+
   /// Opens [folder] inside the current one and shows its files.
   void openFolder(FileFolder folder) {
     state = _with(
@@ -210,6 +215,7 @@ class FilesActionsNotifier extends Notifier<FilesActionsState> {
       return const FilesUploadOutcome(uploaded: 0, failedNames: []);
     }
     final repository = ref.read(filesRepositoryProvider);
+    final parentId = ref.read(filesProvider).folderId;
     final workspace = ref.read(currentOrgIdProvider);
     final version = _workspaceVersion;
     bool sameWorkspace() =>
@@ -229,7 +235,7 @@ class FilesActionsNotifier extends Notifier<FilesActionsState> {
         break;
       }
       final file = files[index];
-      final result = await repository.uploadFile(file);
+      final result = await repository.uploadFile(file, parentId: parentId);
       if (!ref.mounted) break;
       switch (result) {
         case Success():
@@ -249,10 +255,11 @@ class FilesActionsNotifier extends Notifier<FilesActionsState> {
     if (!workspaceChanged && uploaded > 0) {
       final files = ref.read(filesProvider.notifier);
       if (ref.read(filesProvider).view == FilesScope.trash) {
-        files.selectView(FilesScope.all);
+        // Trash has no folders, so All files is the only place uploads can
+        // show; keep the open folder so the uploaded file is visible.
+        files.switchViewKeepingFolder(FilesScope.all);
       }
       files
-        ..goToDepth(0)
         ..setTab(FilesTab.files)
         ..setPage(1);
       ref.invalidate(filesListProvider);

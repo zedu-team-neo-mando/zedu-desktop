@@ -8,6 +8,10 @@ class AuthNotifier extends Notifier<AuthState> {
   late SecureStorageService _storage;
   late AuthInterceptor _interceptor;
 
+  /// How long [loginWithGoogle] waits for the browser redirect before giving
+  /// up and clearing the loading state.
+  Duration googleSignInWait = const Duration(minutes: 5);
+
   /// Guards against overlapping presence-toggle requests (rapid clicks,
   /// reopening the menu while a request is pending).
   bool _presenceToggleInFlight = false;
@@ -351,11 +355,12 @@ class AuthNotifier extends Notifier<AuthState> {
     final result = await _repository.login(email: email, password: password);
     switch (result) {
       case Success<AuthSession>():
-        AppLogger.i(
-          rememberMe
-              ? 'Login succeeded — token persisted'
-              : 'Login succeeded — token kept for this run only',
-          tag: _tag,
+        AppLogger.i('Login succeeded — token persisted', tag: _tag);
+        await _storage.saveAccessToken(result.value.accessToken);
+        state = AuthState(
+          status: AuthStatus.authenticated,
+          user: result.value.user,
+          isLoading: false,
         );
         await _storage.saveAccessToken(
           result.value.accessToken,
@@ -585,15 +590,22 @@ class AuthNotifier extends Notifier<AuthState> {
           // org: keep the locally newer status and take only the fresh profile fields.
           adopted = fresh._withStatus(current.status);
         } else {
-          // On a same-organisation refresh, keep the custom status this
-          // session already holds (loaded from the profile at sign-in, or
-          // confirmed since) while adopting the server's latest presence.
-          // Do not carry it into a different organisation.
-          adopted = orgChanged
-              ? fresh
-              : fresh._withStatus(
-                  current.status.copyWith(online: fresh.status.online),
-                );
+          // If the server's fresh profile contains custom status, adopt it.
+          // Otherwise preserve locally confirmed status while adopting the
+          // server's latest presence. Do not carry them into a different organisation.
+          final UserStatus resolvedStatus;
+          if (orgChanged) {
+            resolvedStatus = fresh.status;
+          } else if (fresh.status.hasCustomStatus) {
+            resolvedStatus = fresh.status;
+          } else if (current.status.hasCustomStatus) {
+            resolvedStatus = current.status.copyWith(
+              online: fresh.status.online,
+            );
+          } else {
+            resolvedStatus = fresh.status;
+          }
+          adopted = orgChanged ? fresh : fresh._withStatus(resolvedStatus);
           _setConfirmedOnline(
             online: fresh.status.online,
             sessionGeneration: sessionGeneration,
@@ -625,6 +637,7 @@ class AuthNotifier extends Notifier<AuthState> {
     state = state.copyWith(isLoading: true, clearError: true);
 
     HttpServer? server;
+    Timer? deadline;
     try {
       final config = locator<AppConfig>();
 
@@ -658,6 +671,13 @@ class AuthNotifier extends Notifier<AuthState> {
       // 3. Wait for Google's redirect containing the authorization code
       String? grantCode;
       String? callbackError;
+      // server.timeout only fires on an established idle connection: a closed
+      // browser tab or a redirect that never arrives leaves no connection, so
+      // cap the whole wait with a deadline that ends the stream and lets the
+      // null-code path below clear isLoading.
+      deadline = Timer(googleSignInWait, () {
+        server?.close(force: true);
+      });
       await for (final request in server.timeout(
         const Duration(seconds: 60),
         onTimeout: (sink) {
@@ -713,6 +733,7 @@ class AuthNotifier extends Notifier<AuthState> {
         await request.response.close();
         break;
       }
+      deadline.cancel();
 
       await server.close();
       server = null;
@@ -769,6 +790,7 @@ class AuthNotifier extends Notifier<AuthState> {
       AppLogger.e('Google Sign-In failed', tag: _tag, error: e);
       state = state.copyWith(isLoading: false, error: 'Google Sign-In failed');
     } finally {
+      deadline?.cancel();
       await server?.close();
     }
   }

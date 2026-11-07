@@ -12,7 +12,7 @@ abstract class FilesRepository {
   });
 
   /// Uploads [file] to the signed-in user's files.
-  Future<Result<WorkspaceFile>> uploadFile(XFile file);
+  Future<Result<WorkspaceFile>> uploadFile(XFile file, {String? parentId});
 
   /// Creates a folder inside [parentId], or at the top level when null.
   Future<Result<void>> createFolder({
@@ -58,6 +58,10 @@ abstract class FilesRepository {
 
   /// [fileId]'s current details, including its access type.
   Future<Result<WorkspaceFile>> fetchFileDetails(String fileId);
+
+  /// [fileId]'s info, including the channels it was shared in. The files list
+  /// does not carry that, so it comes from its own route.
+  Future<Result<WorkspaceFileInfo>> fetchFileInfo(String fileId);
 
   /// Ids of the files the user pinned. Pins belong to the user, not the file.
   Future<Result<Set<String>>> fetchPinnedFileIds();

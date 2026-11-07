@@ -6,6 +6,7 @@ enum AppToastType { success, error, info }
 
 class AppToastService {
   static OverlayEntry? _current;
+  static VoidCallback? _currentRemover;
 
   static void show(
     BuildContext context, {
@@ -44,10 +45,25 @@ class AppToastService {
     required AppToastType type,
     required String message,
   }) {
-    _current?.remove();
+    _currentRemover?.call();
     _current = null;
+    _currentRemover = null;
 
     late OverlayEntry entry;
+    // Two dismissals can race: the close button and the auto-dismiss timer, or
+    // two quick clicks on the close button. Removing an OverlayEntry twice
+    // throws, so every path goes through this once-only remover.
+    var removed = false;
+    void removeEntry() {
+      if (removed) return;
+      removed = true;
+      entry.remove();
+      if (_current == entry) {
+        _current = null;
+        _currentRemover = null;
+      }
+    }
+
     entry = OverlayEntry(
       builder: (ctx) {
         final mq = MediaQuery.of(ctx);
@@ -61,15 +77,13 @@ class AppToastService {
             type: type,
             message: message,
             scale: scale,
-            onDismiss: () {
-              entry.remove();
-              if (_current == entry) _current = null;
-            },
+            onDismiss: removeEntry,
           ),
         );
       },
     );
     _current = entry;
+    _currentRemover = removeEntry;
     overlay.insert(entry);
   }
 }

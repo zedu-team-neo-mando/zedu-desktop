@@ -56,58 +56,92 @@ class MentionSuggestionList extends StatelessWidget {
               itemBuilder: (context, index) {
                 final p = suggestions[index];
                 final initial = avatarInitial(p.username);
-                return InkWell(
+                // One announced, actionable item per person (Ziki #590).
+                return Semantics(
+                  button: true,
+                  label: 'Mention @${p.username}',
+                  excludeSemantics: true,
                   onTap: () => onSelect(p),
-                  hoverColor: colors.primary.withValues(alpha: 0.07),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 14,
-                          backgroundColor: colors.primary,
-                          backgroundImage:
-                              p.avatarUrl != null && p.avatarUrl!.isNotEmpty
-                              ? NetworkImage(p.avatarUrl!)
-                              : null,
-                          child: p.avatarUrl == null || p.avatarUrl!.isEmpty
-                              ? Text(
-                                  initial,
+                  child: InkWell(
+                    onTap: () => onSelect(p),
+                    hoverColor: colors.primary.withValues(alpha: 0.07),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 14,
+                            backgroundColor: colors.primary,
+                            backgroundImage:
+                                p.avatarUrl != null && p.avatarUrl!.isNotEmpty
+                                ? NetworkImage(p.avatarUrl!)
+                                : null,
+                            child: p.avatarUrl == null || p.avatarUrl!.isEmpty
+                                ? Text(
+                                    initial,
+                                    style: TextStyle(
+                                      color: colors.onPrimary,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          const SizedBox(width: 10),
+                          // Long usernames and emails are ellipsized instead
+                          // of overflowing the row.
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  p.username,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    color: colors.onPrimary,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
+                                    color: colors.textPrimary,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
                                   ),
-                                )
-                              : null,
-                        ),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              p.username,
-                              style: TextStyle(
-                                color: colors.textPrimary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
-                              ),
-                            ),
-                            if (p.email.isNotEmpty)
-                              Text(
-                                p.email,
-                                style: TextStyle(
-                                  color: colors.textHint,
-                                  fontSize: 11,
                                 ),
-                              ),
-                          ],
-                        ),
-                      ],
+                                if (p.email.isNotEmpty)
+                                  Text(
+                                    p.email,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: colors.textHint,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                                  ),
+                                ),
+                                if (p.email.isNotEmpty)
+                                  Text(
+                                    p.email,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: colors.textHint,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );

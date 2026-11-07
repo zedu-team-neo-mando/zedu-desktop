@@ -55,8 +55,8 @@ class FilesRepositoryImpl implements FilesRepository {
   });
 
   @override
-  Future<Result<WorkspaceFile>> uploadFile(XFile file) =>
-      _guard(() => remoteDataSource.uploadFile(file));
+  Future<Result<WorkspaceFile>> uploadFile(XFile file, {String? parentId}) =>
+      _guard(() => remoteDataSource.uploadFile(file, parentId: parentId));
 
   @override
   Future<Result<void>> createFolder({
@@ -184,6 +184,10 @@ class FilesRepositoryImpl implements FilesRepository {
   @override
   Future<Result<WorkspaceFile>> fetchFileDetails(String fileId) =>
       _guard(() => remoteDataSource.fetchFileDetails(fileId));
+
+  @override
+  Future<Result<WorkspaceFileInfo>> fetchFileInfo(String fileId) =>
+      _guard(() => remoteDataSource.fetchFileInfo(fileId));
 
   @override
   Future<Result<Set<String>>> fetchPinnedFileIds() =>

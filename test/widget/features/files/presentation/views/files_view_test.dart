@@ -55,6 +55,9 @@ class _FakeProfileNotifier extends UserProfileNotifier {
   Future<void> load() async {}
 }
 
+/// Signed in as Ada (`u-1`), who owns the listed files. The share dialog reads
+/// the signed-in user to leave them out of its suggestions.
+
 class _FakePeopleRepository implements PeopleRepository {
   static const members = [
     OrgMember(id: 'u-2', name: 'Grace Hopper', email: 'grace@zedu.test'),
@@ -83,7 +86,7 @@ class _FakePeopleRepository implements PeopleRepository {
   }
 }
 
-class _FakeFilesRepository implements FilesRepository {
+class _FakeFilesRepository extends Fake implements FilesRepository {
   _FakeFilesRepository({
     this.failFolders = false,
     this.failCreate = false,
@@ -170,6 +173,10 @@ class _FakeFilesRepository implements FilesRepository {
     return details.future;
   }
 
+  @override
+  Future<Result<WorkspaceFileInfo>> fetchFileInfo(String fileId) async =>
+      Success(WorkspaceFileInfo());
+
   Set<String> pinnedIds = {};
   final pinCalls = <(String, bool)>[];
   Result<void> pinResult = const Success(null);
@@ -217,6 +224,9 @@ class _FakeFilesRepository implements FilesRepository {
     deletes.add((fileId, permanent));
     return deleteResult;
   }
+
+  @override
+  Future<Result<void>> deleteFolder(String id) async => const Success(null);
 
   /// What a download returns; complete it to finish the download.
   Completer<Result<void>> download = Completer()..complete(const Success(null));
@@ -298,8 +308,10 @@ class _FakeFilesRepository implements FilesRepository {
   }
 
   @override
-  Future<Result<WorkspaceFile>> uploadFile(XFile file) async =>
-      Success(WorkspaceFile(id: 'up', name: file.name));
+  Future<Result<WorkspaceFile>> uploadFile(
+    XFile file, {
+    String? parentId,
+  }) async => Success(WorkspaceFile(id: 'up', name: file.name));
 
   @override
   Future<Result<void>> createFolder({
