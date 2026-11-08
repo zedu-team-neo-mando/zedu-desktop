@@ -38,6 +38,23 @@ void main() {
     ]);
   });
 
+  test('Name (A–Z) orders by name ignoring case, equal names newest first', () {
+    final files = [
+      WorkspaceFile(id: 'b', name: 'budget.xlsx', updatedAt: DateTime(2026)),
+      WorkspaceFile(id: 'Z', name: 'Zebra.png', updatedAt: DateTime(2026)),
+      WorkspaceFile(id: 'a-old', name: 'Agenda.pdf', updatedAt: DateTime(2025)),
+      WorkspaceFile(id: 'a-new', name: 'agenda.pdf', updatedAt: DateTime(2026)),
+    ];
+
+    expect(FilesSort.nameAz.apply(files).map((f) => f.id), [
+      'a-new',
+      'a-old',
+      'b',
+      'Z',
+    ]);
+    expect(FilesSort.nameAz.label, 'Name (A–Z)');
+  });
+
   test('a file takes its type from a MIME type or its name', () {
     expect(
       WorkspaceFile.fromJson({
@@ -56,6 +73,12 @@ void main() {
     expect(formatFileSize(512), '512 B');
     expect(formatFileSize(1536), '1.5 KB');
     expect(formatFileSize(12 * 1024 * 1024), '12 MB');
+    // Just under a unit boundary: rounds up to the next unit, not to a
+    // full 1024 of the smaller one.
+    expect(formatFileSize(1048500), '1 MB');
+    expect(formatFileSize(1073700000), '1 GB');
+    expect(formatFileSize(10200), '10 KB');
+    expect(formatFileSize(9625), '9.4 KB');
     expect(formatFileDate(DateTime(2026, 11, 1)), 'Nov 1, 2026');
     expect(formatFileDate(null), '—');
     expect(formatItemCount(1), '1 item');

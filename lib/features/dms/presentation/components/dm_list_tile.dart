@@ -67,6 +67,8 @@ class DmListTile extends ConsumerWidget {
           onTap: () {
             ref.read(selectedDmProvider.notifier).select(conversation);
           },
+          onSecondaryTapUp: (details) =>
+              showDmRowMenu(context, ref, conversation, details.globalPosition),
           child: Stack(
             children: [
               if (isSelected)
@@ -209,13 +211,15 @@ class DmListTile extends ConsumerWidget {
             if (hasUnread) ...[
               const SizedBox(height: 4),
               Container(
+                constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                alignment: Alignment.center,
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: colors.accent,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  '${conversation.unreadCount}',
+                  conversation.unreadCount.unreadBadgeText,
                   style: TextStyle(
                     color: colors.textPrimary,
                     fontSize: 10,

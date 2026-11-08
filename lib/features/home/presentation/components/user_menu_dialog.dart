@@ -31,8 +31,6 @@ class _UserMenuDialogState extends ConsumerState<UserMenuDialog> {
     final settings = ref.watch(notificationSettingsProvider);
     final displayName = authUser?.fullname ?? 'AnonymousUser';
     final status = authUser?.status ?? UserStatus.empty;
-    final orgSlug = authUser?.currentOrganisationSlug ?? '';
-    final signOutTarget = orgSlug.isEmpty ? 'Zedu' : orgSlug;
     final isOnline = status.online;
     final pausedUntil = settings.isDndActive ? settings.dndUntil : null;
 
@@ -138,7 +136,7 @@ class _UserMenuDialogState extends ConsumerState<UserMenuDialog> {
                               const SizedBox(width: 4),
                               Flexible(
                                 child: Text(
-                                  '$balance AI credits',
+                                  aiCreditsLabel(balance),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
@@ -304,6 +302,9 @@ class _UserMenuDialogState extends ConsumerState<UserMenuDialog> {
                 onTap: () {
                   Navigator.pop(context);
                   ref.read(personalProfilePanelProvider.notifier).state = true;
+                  if (context.mounted) {
+                    context.go(AppRouter.home);
+                  }
                 },
               ),
               _MenuItemButton(
@@ -328,9 +329,11 @@ class _UserMenuDialogState extends ConsumerState<UserMenuDialog> {
               const SizedBox(height: 8),
 
               // ── Sign out ───────────────────────────────────────────────────
+              // Ends the whole Zedu session, not just this workspace, so the
+              // label names Zedu rather than the current organisation.
               _MenuItemButton(
                 icon: Icons.logout_rounded,
-                label: 'Sign out of $signOutTarget',
+                label: 'Sign out of Zedu',
                 isError: true,
                 onTap: () async {
                   Navigator.pop(context);
@@ -543,9 +546,7 @@ String _initialsFor(String name) {
       .where((part) => part.isNotEmpty)
       .take(2);
   if (parts.isEmpty) return '?';
-  return parts
-      .map((part) => String.fromCharCode(part.runes.first).toUpperCase())
-      .join();
+  return parts.map((part) => part.characters.first.toUpperCase()).join();
 }
 
 Duration _durationUntilTomorrowMorning() {

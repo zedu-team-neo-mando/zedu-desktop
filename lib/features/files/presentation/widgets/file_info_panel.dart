@@ -43,6 +43,10 @@ class FileInfoPanel extends ConsumerWidget {
     final colors = context.colors;
     final details = ref.watch(fileDetailsProvider(file.id));
     final current = details.value ?? file;
+    final info = ref.watch(fileInfoProvider(file.id));
+    final sharedIn = info is AsyncData<WorkspaceFileInfo>
+        ? info.value.sharedInLabel
+        : '';
 
     final labelStyle = context.textTheme.bodyMedium?.copyWith(
       fontSize: 13,
@@ -157,7 +161,11 @@ class FileInfoPanel extends ConsumerWidget {
                   ),
                   row(
                     'Shared in',
-                    text(current.sharedIn.isEmpty ? '—' : current.sharedIn),
+                    text(
+                      sharedIn.isNotEmpty
+                          ? sharedIn
+                          : (current.sharedIn.isEmpty ? '—' : current.sharedIn),
+                    ),
                   ),
                   row('File size', text(formatFileSize(current.size))),
                   row(
@@ -232,6 +240,16 @@ class _PreviewCard extends StatelessWidget {
 
   final WorkspaceFile file;
 
+  Future<void> _copy(BuildContext context, String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!context.mounted) return;
+    AppToastService.show(
+      context,
+      type: AppToastType.success,
+      message: 'File name copied',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
@@ -285,15 +303,32 @@ class _PreviewCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        file.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.textTheme.bodyMedium?.copyWith(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: colors.textPrimary,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              file.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: context.textTheme.bodyMedium?.copyWith(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: colors.textPrimary,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Copy file name',
+                            visualDensity: const VisualDensity(
+                              horizontal: VisualDensity.minimumDensity,
+                              vertical: VisualDensity.minimumDensity,
+                            ),
+                            iconSize: 16,
+                            color: colors.textSecondary,
+                            icon: const Icon(Icons.copy),
+                            onPressed: () => _copy(context, file.name),
+                          ),
+                        ],
                       ),
                       if (file.fileType.isNotEmpty)
                         Text(
@@ -309,14 +344,23 @@ class _PreviewCard extends StatelessWidget {
           Container(
             height: 200,
             color: colors.primaryBg,
-            child: file.isImage && file.link.isNotEmpty
-                ? Image.network(
-                    file.link,
-                    fit: BoxFit.contain,
-                    semanticLabel: file.name,
-                    errorBuilder: (_, _, _) => noPreview(),
-                  )
-                : noPreview(),
+            child: file.link.isEmpty
+                ? noPreview()
+                : switch (FilePreviewKind.of(file)) {
+                    FilePreviewKind.svg => SvgPicture.network(
+                      file.link,
+                      fit: BoxFit.contain,
+                      semanticsLabel: file.name,
+                      errorBuilder: (_, _, _) => noPreview(),
+                    ),
+                    FilePreviewKind.image => Image.network(
+                      file.link,
+                      fit: BoxFit.contain,
+                      semanticLabel: file.name,
+                      errorBuilder: (_, _, _) => noPreview(),
+                    ),
+                    _ => noPreview(),
+                  },
           ),
         ],
       ),

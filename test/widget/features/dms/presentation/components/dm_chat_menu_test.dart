@@ -29,6 +29,8 @@ Future<void> _pumpChatArea(
   when(() => history.loadFailed).thenReturn(false);
   when(() => history.loadMoreFailed).thenReturn(false);
   when(() => history.historyCleared).thenReturn(false);
+  when(() => history.loadAll()).thenAnswer((_) async {});
+  when(() => history.currentUserName).thenReturn(username);
   final drafts = MockDraftStore();
   when(() => drafts.load(any())).thenAnswer((_) async => null);
 
@@ -116,44 +118,47 @@ void main() {
     await _unmount(tester);
   });
 
-  testWidgets('every menu row has a handler and no dead rows are offered', (
-    tester,
-  ) async {
+  testWidgets('every row the DM menu offers has a handler', (tester) async {
+    // Mirrors the cases in _handleMenuAction. A row with no case silently does
+    // nothing when pressed, so the two sets must stay equal.
+    const handled = <String>{
+      'view_profile',
+      'mute_notifications',
+      'pin_conversation',
+      'pinned_messages',
+      'saved_items',
+      'search_in_conversation',
+      'view_links',
+      'view_files',
+      'export_transcript',
+      'clear_history',
+      'delete_conversation',
+    };
+
     await _pumpChatArea(tester);
     await tester.tap(find.byTooltip('More options'));
     await tester.pumpAndSettle();
 
-    final menuValues = tester
-        .widgetList<PopupMenuItem<String>>(
-          find.byWidgetPredicate((w) => w is PopupMenuItem<String>),
-        )
+    final offered = tester
+        .widgetList<PopupMenuItem<String>>(find.byType(PopupMenuItem<String>))
         .map((item) => item.value)
-        .toList();
+        .toSet();
 
-    expect(menuValues, isNotEmpty);
-    expect(menuValues, isNot(contains('block_user')));
+    expect(offered, handled);
     expect(find.text('Block User'), findsNothing);
+    await _unmount(tester);
+  });
 
-    // Keys _handleMenuAction responds to; keep in sync with the switch.
-    const handled = {
-      'view_profile',
-      'mute_notifications',
-      'pin_conversation',
-      'search_in_conversation',
-      'view_files',
-      'clear_history',
-      'delete_conversation',
-    };
-    // Handled by a separate fix already in review for Ziki #2687 (PR 1296).
-    const pendingElsewhere = {'pinned_messages'};
+  testWidgets('Export transcript opens the export dialog', (tester) async {
+    await _pumpChatArea(tester);
+    await tester.tap(find.byTooltip('More options'));
+    await tester.pumpAndSettle();
 
-    for (final value in menuValues) {
-      expect(
-        handled.contains(value) || pendingElsewhere.contains(value),
-        isTrue,
-        reason: 'menu action "$value" has no handler in _handleMenuAction',
-      );
-    }
+    await tester.tap(find.text('Export transcript'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ExportTranscriptDialog), findsOneWidget);
+    expect(find.text('0 messages will be exported.'), findsOneWidget);
     await _unmount(tester);
   });
 
@@ -214,5 +219,56 @@ void main() {
       expect(find.byType(Dialog), findsNothing);
       await _unmount(tester);
     });
+  });
+
+  testWidgets('selecting Pinned messages displays modal and does not throw', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final history = MockChatHistory();
+    when(() => history.messages).thenReturn([]);
+    when(() => history.isLoading).thenReturn(false);
+    when(() => history.hasMore).thenReturn(false);
+    when(() => history.loadFailed).thenReturn(false);
+    when(() => history.loadMoreFailed).thenReturn(false);
+    when(() => history.historyCleared).thenReturn(false);
+    final drafts = MockDraftStore();
+    when(() => drafts.load(any())).thenAnswer((_) async => null);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
+          chatHistoryProvider('chat-1').overrideWith((ref) => history),
+          dmDraftStoreProvider.overrideWith((ref) => drafts),
+        ],
+        child: buildTestMaterialApp(
+          Scaffold(
+            body: DmChatArea(
+              conversation: DmConversation(
+                channelId: 'chat-1',
+                username: 'Pinned Tester',
+                participantId: 'user-2',
+                previewMessage: '',
+                unreadCount: 0,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('More options'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pinned messages'), findsOneWidget);
+    await tester.tap(find.text('Pinned messages'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pinned messages are not available yet'), findsOneWidget);
   });
 }

@@ -133,6 +133,24 @@ NotificationSettings readNotificationSettings(WidgetTester tester) {
 }
 
 void main() {
+  testWidgets(
+    'sign-out names Zedu, not the organisation, since it ends the session',
+    (tester) async {
+      await pumpOpenMenu(
+        tester,
+        FakeAuthNotifier(
+          initial: AuthState(
+            status: AuthStatus.authenticated,
+            user: _buildUser(),
+          ),
+        ),
+      );
+
+      expect(find.text('Sign out of Zedu'), findsOneWidget);
+      expect(find.text('Sign out of test-org'), findsNothing);
+    },
+  );
+
   group('UserMenuDialog presence toggle', () {
     testWidgets('shows Active presence with an away action while online', (
       tester,

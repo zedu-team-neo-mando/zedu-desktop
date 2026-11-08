@@ -3,11 +3,14 @@ import 'package:zedu/features/features.dart';
 enum UserProfileSection {
   account,
   notifications,
+  desktop,
   security,
   organization,
+  webhooks,
   userManagement,
   rolesAndPermissions,
   billing,
+  channelManagement,
 }
 
 class UserProfileState {

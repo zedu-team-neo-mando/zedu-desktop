@@ -78,11 +78,31 @@ void main() {
     expect(outcome.message, 'Shared logo.png with 2 people by direct message.');
   });
 
-  test('without a list of sent messages, everyone got it', () async {
+  test('an empty server reply confirms nothing', () async {
     answer(const Success(FileShareResult()));
 
     final outcome = await share([_grace, _alan]);
 
+    expect(outcome.shared, isFalse);
+    expect(outcome.complete, isFalse);
+    expect(outcome.message, 'Could not share logo.png. Please try again.');
+  });
+
+  test('counts server-confirmed recipients without a sent list', () async {
+    answer(
+      const Success(
+        FileShareResult(
+          recipients: [
+            FileShareRecipientResult(userId: 'u-2', success: true),
+            FileShareRecipientResult(userId: 'u-3', success: true),
+          ],
+        ),
+      ),
+    );
+
+    final outcome = await share([_grace, _alan]);
+
+    expect(outcome.shared, isTrue);
     expect(outcome.complete, isTrue);
     expect(outcome.message, 'Shared logo.png with 2 people by direct message.');
   });

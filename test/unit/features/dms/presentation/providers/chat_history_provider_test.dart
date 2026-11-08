@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../../../../../helpers/helpers.dart';
+
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
@@ -62,6 +63,53 @@ void main() {
         expect(notifier.messages.single['content'], 'corrected');
         container.dispose();
       }
+    });
+
+    testWidgets('updates attachment details changed by a remote edit', (
+      tester,
+    ) async {
+      final reads = [
+        [
+          {
+            'id': 'm1',
+            'content': 'original',
+            'user_id': 'u1',
+            'media': [
+              {'file_name': 'before.pdf'},
+            ],
+          },
+        ],
+        [
+          {
+            'id': 'm1',
+            'content': 'original',
+            'user_id': 'u1',
+            'media': [
+              {'file_name': 'after.pdf'},
+            ],
+          },
+        ],
+      ];
+      when(
+        () => repository.getMessages(any(), page: any(named: 'page')),
+      ).thenAnswer((_) async => reads.removeAt(0));
+      final container = ProviderContainer(
+        overrides: [
+          authNotifierProvider.overrideWith(_SignedOutAuth.new),
+          dmRepositoryProvider.overrideWithValue(repository),
+        ],
+      );
+      final notifier = open(container);
+      await tester.pump();
+
+      await tester.pump(const Duration(seconds: 10));
+      await tester.pump();
+
+      expect(notifier.messages, hasLength(1));
+      expect(notifier.messages.single['media'], [
+        {'file_name': 'after.pdf'},
+      ]);
+      container.dispose();
     });
 
     testWidgets('leaves the list alone when the response is unchanged', (
@@ -215,7 +263,7 @@ void main() {
 
       verify(
         () => mockRepository.editMessage(
-          any(),
+          'local-1',
           content: 'edited',
           threadId: 't-1',
         ),
@@ -840,6 +888,49 @@ void _retryTests() {
         () => autoNotifier.notifyListeners(),
         throwsA(isA<FlutterError>()),
       );
+    });
+
+    test('marks message as failed when sendMessage throws an error', () async {
+      when(
+        () => mockRepository.sendMessage(
+          any(),
+          any(),
+          media: any(named: 'media'),
+          mentions: any(named: 'mentions'),
+          isChannel: any(named: 'isChannel'),
+        ),
+      ).thenThrow(Exception('Send message failed'));
+
+      await notifier.sendMessage('failing message');
+
+      expect(notifier.messages.first['status'], 'failed');
+      expect(notifier.messages.first['content'], 'failing message');
+    });
+
+    test('retains failed status when retryMessage throws an error', () async {
+      when(
+        () => mockRepository.sendMessage(
+          any(),
+          any(),
+          media: any(named: 'media'),
+          mentions: any(named: 'mentions'),
+          isChannel: any(named: 'isChannel'),
+        ),
+      ).thenThrow(Exception('Retry failed'));
+
+      notifier.messages = [
+        {
+          'id': 'failed-msg-retry',
+          'content': 'Retrying content',
+          'channel_id': 'channel-xyz',
+          'status': 'failed',
+        },
+      ];
+
+      await notifier.retryMessage('failed-msg-retry');
+
+      expect(notifier.messages.first['status'], 'failed');
+      expect(notifier.messages.first['content'], 'Retrying content');
     });
   });
 }

@@ -31,42 +31,63 @@ class _HomeViewState extends ConsumerState<HomeView> {
     });
     final colors = context.colors;
     final showProfile = ref.watch(personalProfilePanelProvider);
+    final sidebarVisible = ref.watch(sidebarVisibilityProvider);
 
-    return Scaffold(
-      backgroundColor: colors.background,
-      body: Column(
-        children: [
-          const _HomeAppBar(),
-          Expanded(
-            child: Row(
-              children: [
-                AppSidebarRail(activeType: ref.watch(homeSidebarProvider)),
-                // Buzz is a full-width page, as on the web. The sidebar
-                // stays mounted so it keeps the width the user dragged it to.
-                Visibility(
-                  visible:
-                      ref.watch(homeSidebarProvider) != HomeSidebarType.buzz,
-                  maintainState: true,
-                  child: ResizableSidebar(child: const _MainSidebarSwitcher()),
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.backslash, meta: true): () =>
+            ref.read(sidebarVisibilityProvider.notifier).toggle(),
+        const SingleActivator(
+          LogicalKeyboardKey.backslash,
+          control: true,
+        ): () =>
+            ref.read(sidebarVisibilityProvider.notifier).toggle(),
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
+          backgroundColor: colors.background,
+          body: Column(
+            children: [
+              const _HomeAppBar(),
+              const OfflineStatusIndicator(),
+              Expanded(
+                child: Row(
+                  children: [
+                    AppSidebarRail(activeType: ref.watch(homeSidebarProvider)),
+                    // Buzz is a full-width page, as on the web. The sidebar
+                    // stays mounted so it keeps the width the user dragged it to.
+                    Visibility(
+                      visible:
+                          ref.watch(homeSidebarProvider) !=
+                          HomeSidebarType.buzz,
+                      maintainState: true,
+                      child: sidebarVisible
+                          ? const ResizableSidebar(
+                              child: _MainSidebarSwitcher(),
+                            )
+                          : const SizedBox(width: 0),
+                    ),
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          const Positioned.fill(child: _ChatAreaSwitcher()),
+                          if (showProfile)
+                            const Positioned(
+                              right: 0,
+                              top: 0,
+                              bottom: 0,
+                              child: PersonalProfilePanel(),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                Expanded(
-                  child: Stack(
-                    children: [
-                      const Positioned.fill(child: _ChatAreaSwitcher()),
-                      if (showProfile)
-                        const Positioned(
-                          right: 0,
-                          top: 0,
-                          bottom: 0,
-                          child: PersonalProfilePanel(),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -87,6 +108,8 @@ class _HomeAppBar extends ConsumerWidget {
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Row(
         children: [
+          const SidebarToggleButton(),
+          const SizedBox(width: 4),
           Text(
             'Zedu',
             style: TextStyle(
@@ -100,30 +123,41 @@ class _HomeAppBar extends ConsumerWidget {
           TopUserMenu(userName: userName),
           const Spacer(),
           Flexible(
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 400),
-              height: 28,
-              decoration: BoxDecoration(
-                color: colors.onPrimary.withValues(alpha: 0.16),
+            child: Semantics(
+              button: true,
+              label: 'Search messages',
+              child: InkWell(
+                key: const Key('home-search-messages'),
                 borderRadius: BorderRadius.circular(6),
-              ),
-              child: Row(
-                children: [
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.search,
-                    color: colors.onPrimary.withValues(alpha: 0.7),
-                    size: 18,
+                // #2825: opens workspace message search with From, In and
+                // Date filters.
+                onTap: () => showMessageSearch(context),
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 400),
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: colors.onPrimary.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Search messages...',
-                    style: TextStyle(
-                      color: colors.onPrimary.withValues(alpha: 0.7),
-                      fontSize: 13,
-                    ),
+                  child: Row(
+                    children: [
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.search,
+                        color: colors.onPrimary.withValues(alpha: 0.7),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Search messages...',
+                        style: TextStyle(
+                          color: colors.onPrimary.withValues(alpha: 0.7),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -219,84 +253,106 @@ class _MainSidebar extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const WorkspaceSwitcherHeader(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-            child: Row(
-              children: [
-                Icon(Icons.arrow_drop_down, color: colors.onPrimary, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  'Channels',
-                  style: TextStyle(
-                    color: colors.onPrimary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SidebarChannelList(),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Material(
-              color: colors.onPrimary.withValues(alpha: 0.05),
-              shape: RoundedRectangleBorder(
-                side: BorderSide(
-                  color: colors.onPrimary.withValues(alpha: 0.24),
-                ),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                hoverColor: colors.onPrimary.withValues(alpha: 0.1),
-                onTap: () => ref
-                    .read(activeChatProvider.notifier)
-                    .selectChannelDirectory(),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'View all channels',
+          // Scrolls when the window is too short for every section.
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.arrow_drop_down,
+                          color: colors.onPrimary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Channels',
                           style: TextStyle(
-                            color: colors.onPrimary.withValues(alpha: 0.7),
-                            fontSize: 13,
+                            color: colors.onPrimary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SidebarChannelList(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: Material(
+                      color: colors.onPrimary.withValues(alpha: 0.12),
+                      shape: RoundedRectangleBorder(
+                        side: BorderSide(
+                          color: colors.onPrimary.withValues(alpha: 0.45),
+                        ),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        hoverColor: colors.onPrimary.withValues(alpha: 0.2),
+                        onTap: () => ref
+                            .read(activeChatProvider.notifier)
+                            .selectChannelDirectory(),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'View all channels',
+                                  style: TextStyle(
+                                    color: colors.onPrimary,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              Icon(
+                                Icons.chevron_right,
+                                color: colors.onPrimary,
+                                size: 16,
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                      Icon(
-                        Icons.chevron_right,
-                        color: colors.onPrimary.withValues(alpha: 0.7),
-                        size: 16,
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                  const _AddChannelButton(),
+                  const SidebarDmSection(),
+                  const SizedBox(height: 20),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.arrow_right,
+                          color: colors.onPrimary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'People',
+                          style: TextStyle(
+                            color: colors.onPrimary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ),
-          const _AddChannelButton(),
-          const SizedBox(height: 20),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Icon(Icons.arrow_right, color: colors.onPrimary, size: 20),
-                const SizedBox(width: 8),
-                Text(
-                  'People',
-                  style: TextStyle(
-                    color: colors.onPrimary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
-                ),
-              ],
             ),
           ),
         ],
@@ -403,7 +459,11 @@ class HomeChatArea extends ConsumerWidget {
       );
     }
 
-    return Column(
+    // The channel's full-history search, beside the messages (Ziki #2849).
+    final searchOpen =
+        channelId.isNotEmpty && ref.watch(channelSearchProvider) == channelId;
+
+    final chatColumn = Column(
       children: [
         _buildChatHeader(context, channelName, selected),
         Expanded(
@@ -415,12 +475,27 @@ class HomeChatArea extends ConsumerWidget {
                   empty: welcome,
                 ),
         ),
-        DmMessageComposer(
-          key: ValueKey(selected?.id ?? channelName),
-          recipientName: '#$channelName',
-          channelId: selected?.id ?? '',
-          participants: members,
-          isChannel: true,
+        if (selected?.archived == true)
+          _ArchivedChannelBanner(channelName: channelName)
+        else
+          DmMessageComposer(
+            key: ValueKey(selected?.id ?? channelName),
+            recipientName: '#$channelName',
+            channelId: selected?.id ?? '',
+            participants: members,
+            isChannel: true,
+          ),
+      ],
+    );
+    if (!searchOpen) return chatColumn;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(child: chatColumn),
+        SearchPanel(
+          key: ValueKey('channel-search-$channelId'),
+          channelId: channelId,
+          onClose: () => ref.read(channelSearchProvider.notifier).close(),
         ),
       ],
     );
@@ -432,6 +507,7 @@ class HomeChatArea extends ConsumerWidget {
     Channel? channel,
   ) {
     final colors = context.colors;
+    final topic = channel?.topic?.trim() ?? '';
 
     return Container(
       height: 60,
@@ -442,24 +518,55 @@ class HomeChatArea extends ConsumerWidget {
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              '# $channelName',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: colors.textPrimary,
-              ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '# $channelName',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: colors.textPrimary,
+                  ),
+                ),
+                // The topic set in Edit channel, shown under the name so it
+                // is visible once saved (#2852); hidden when empty.
+                if (topic.isNotEmpty)
+                  Text(
+                    topic,
+                    key: const ValueKey('channel_header_topic'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, color: colors.textSecondary),
+                  ),
+              ],
             ),
           ),
           _HeaderAction(icon: Icons.headphones_outlined, label: 'Start Buzz'),
           const SizedBox(width: 12),
-          CircleAvatar(
-            radius: 14,
-            backgroundColor: colors.accent,
-            child: Icon(Icons.person, size: 18, color: colors.onPrimary),
-          ),
+          // The same count the channel directory shows, so the two agree.
+          if (channel != null)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.person_outline,
+                  size: 18,
+                  color: colors.textSecondary,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  channel.membersCount.countLabel('member'),
+                  key: const ValueKey('channel_header_member_count'),
+                  style: TextStyle(fontSize: 12, color: colors.textSecondary),
+                ),
+              ],
+            )
+          else
+            Icon(Icons.person_outline, size: 20, color: colors.textHint),
           const SizedBox(width: 8),
           if (channel == null)
             Icon(Icons.more_vert, color: colors.textHint)
@@ -501,6 +608,38 @@ class HomeChatArea extends ConsumerWidget {
   }
 }
 
+/// Replaces the composer of an archived channel: read-only, as on the web.
+class _ArchivedChannelBanner extends StatelessWidget {
+  const _ArchivedChannelBanner({required this.channelName});
+
+  final String channelName;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: colors.divider)),
+        color: colors.primaryBg,
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.lock_outline, size: 18, color: colors.textSecondary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '#$channelName is archived and read-only.',
+              style: TextStyle(fontSize: 14, color: colors.textSecondary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// The channel header's "more" menu.
 class _ChannelHeaderMenu extends ConsumerWidget {
   final Channel channel;
@@ -516,10 +655,92 @@ class _ChannelHeaderMenu extends ConsumerWidget {
       tooltip: 'Channel options',
       position: PopupMenuPosition.under,
       icon: Icon(Icons.more_vert, color: colors.textHint),
+
       onSelected: (value) {
-        if (value == 'leave') _confirmLeave(context, ref);
+        if (value == 'search') {
+          ref.read(channelSearchProvider.notifier).open(channel.id);
+        }
+        if (value == 'links') _showLinks(context, ref);
+        if (value == 'export') {
+          showDialog<void>(
+            context: context,
+            builder: (_) => ChannelExportDialog(channel: channel),
+          );
+        }
+        if (value == 'leave') confirmLeaveChannel(context, ref, channel);
+        if (value == 'archive') confirmArchiveChannel(context, ref, channel);
+        if (value == 'unarchive') {
+          setChannelArchived(context, ref, channel, archived: false);
+        }
       },
       itemBuilder: (_) => [
+        PopupMenuItem(
+          value: 'search',
+          child: Row(
+            children: [
+              Icon(Icons.search, size: 18, color: colors.textPrimary),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Text(
+                  'Search in channel',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: colors.textPrimary),
+                ),
+              ),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'links',
+          child: Row(
+            children: [
+              Icon(Icons.link, size: 18, color: colors.textPrimary),
+              const SizedBox(width: 12),
+              Text('View links', style: TextStyle(color: colors.textPrimary)),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: 'export',
+          child: Row(
+            children: [
+              Icon(
+                Icons.download_outlined,
+                size: 18,
+                color: colors.textPrimary,
+              ),
+              const SizedBox(width: 12),
+              // The menu is at most 280 px wide; let the label shrink
+              // rather than overflow (e.g. with the app's text zoom).
+              Flexible(
+                child: Text(
+                  'Export history',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: colors.textPrimary),
+                ),
+              ),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: channel.archived ? 'unarchive' : 'archive',
+          child: Row(
+            children: [
+              Icon(
+                channel.archived
+                    ? Icons.unarchive_outlined
+                    : Icons.archive_outlined,
+                size: 18,
+                color: colors.textPrimary,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                channel.archived ? 'Unarchive channel' : 'Archive channel',
+                style: TextStyle(color: colors.textPrimary),
+              ),
+            ],
+          ),
+        ),
         PopupMenuItem(
           value: 'leave',
           child: Row(
@@ -534,66 +755,41 @@ class _ChannelHeaderMenu extends ConsumerWidget {
     );
   }
 
-  Future<void> _confirmLeave(BuildContext context, WidgetRef ref) async {
-    final colors = context.colors;
-    final confirmed = await showDialog<bool>(
+  Future<void> _showLinks(BuildContext context, WidgetRef ref) async {
+    List<ConversationLinkSource> pendingSources() => [
+      for (final message in ref.read(chatHistoryProvider(channel.id)).messages)
+        if (message['channel_id'] == channel.id ||
+            message['is_channel'] == true)
+          ConversationLinkSource(
+            content: message['content']?.toString() ?? '',
+            author: (message['sender_name'] ?? '').toString(),
+            sharedAt: DateTime.tryParse(
+              message['created_at']?.toString() ?? '',
+            ),
+          ),
+    ];
+
+    await showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('Leave #${channel.name}?'),
-        content: Text(
-          channel.isPrivate
-              ? 'You will stop getting its messages, and someone will need to '
-                    'add you again to rejoin.'
-              : 'You will stop getting its messages. You can join it again '
-                    'from the channel directory.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: Text('Leave', style: TextStyle(color: colors.error)),
-          ),
-        ],
+      builder: (context) => ConversationLinksDialog(
+        title: '#${channel.name} links',
+        messages: pendingSources(),
+        loadMessages: () async {
+          final messages = await ref.read(
+            channelHistoryProvider(channel.id).future,
+          );
+          return [
+            ...pendingSources(),
+            for (final message in messages.messages)
+              ConversationLinkSource(
+                content: message.rawContent,
+                author: message.senderName,
+                sharedAt: message.createdAt,
+              ),
+          ];
+        },
       ),
     );
-    if (confirmed != true || !context.mounted) return;
-
-    final overlay = Overlay.of(context, rootOverlay: true);
-    final result = await ref
-        .read(channelProvider.notifier)
-        .leaveChannel(channel.id);
-
-    switch (result) {
-      case Success<void>():
-        // Open another channel so the header never shows one we left.
-        final remaining = ref.read(channelProvider).value ?? const <Channel>[];
-        ref
-            .read(activeChatProvider.notifier)
-            .selectChannel(
-              remaining.isEmpty ? 'general' : remaining.first.name,
-            );
-        AppToastService.showWith(
-          overlay,
-          type: AppToastType.success,
-          message: 'You left #${channel.name}',
-        );
-      case Failure<void>(:final error):
-        AppToastService.showWith(
-          overlay,
-          type: AppToastType.error,
-          message: switch (error.kind) {
-            ApiFailureKind.unknown || ApiFailureKind.parsing =>
-              'Could not leave #${channel.name}. Please try again.',
-            _ =>
-              error.friendlyMessage.isEmpty
-                  ? 'Could not leave #${channel.name}'
-                  : error.friendlyMessage,
-          },
-        );
-    }
   }
 }
 

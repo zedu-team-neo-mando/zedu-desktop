@@ -85,35 +85,10 @@ class _LoginViewState extends ConsumerState<LoginView> {
         toolbarHeight: 80,
         backgroundColor: context.colors.background,
         elevation: 0,
-        title: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 40),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Image.asset('assets/pngs/zedu_logo.png', width: 83, height: 31),
-              Text.rich(
-                TextSpan(
-                  text: "Don't have an account? ",
-                  style: context.textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w400,
-                    color: context.colors.textPrimary,
-                    fontFamily: FontFamily.roboto,
-                  ),
-                  children: [
-                    TextSpan(
-                      text: 'Sign up',
-                      style: context.textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w400,
-                        color: context.colors.primary,
-                        fontFamily: FontFamily.roboto,
-                      ),
-                      recognizer: _signUpLink,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+        title: AuthHeaderRow(
+          prompt: "Don't have an account? ",
+          action: 'Sign up',
+          recognizer: _signUpLink,
         ),
       ),
       body: SingleChildScrollView(
@@ -138,8 +113,9 @@ class _LoginViewState extends ConsumerState<LoginView> {
                   icon: 'assets/svgs/google_logo.svg',
                   label: 'Sign in with Google',
                   loading: authState.isLoading,
-                  onPressed: () =>
-                      ref.read(authNotifierProvider.notifier).loginWithGoogle(),
+                  onPressed: () => ref
+                      .read(authNotifierProvider.notifier)
+                      .loginWithGoogle(rememberMe: _rememberMe),
                 ),
                 context.gapV(12),
                 SocialAuthButton(
@@ -225,15 +201,20 @@ class _LoginViewState extends ConsumerState<LoginView> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Checkbox(
                                   value: _rememberMe,
+                                  materialTapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: VisualDensity.compact,
                                   onChanged: (value) {
                                     setState(() {
                                       _rememberMe = value ?? false;
                                     });
                                   },
                                 ),
+                                const SizedBox(width: 8),
                                 const Text('Remember me'),
                               ],
                             ),
@@ -263,7 +244,7 @@ class _LoginViewState extends ConsumerState<LoginView> {
                 ),
                 context.gapV(12),
                 Align(
-                  alignment: Alignment.topLeft,
+                  alignment: Alignment.center,
                   child: InkWell(
                     onTap: () => context.go(AppRouter.magicLinkRequest),
                     child: Text(

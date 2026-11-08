@@ -35,6 +35,10 @@ class DmConversation {
 
   String get displayName => username.isNotEmpty ? username : 'Unknown';
 
+  /// True when this is the signed-in user's own space: a DM with themselves.
+  bool isOwnSpaceFor(String? userId) =>
+      userId != null && userId.isNotEmpty && participantId == userId;
+
   /// Tells conversations apart for selection and drafts. Someone you haven't
   /// messaged yet has no channel, so their row is identified by the person.
   String get conversationKey =>
@@ -47,6 +51,9 @@ class DmConversation {
   /// False when the conversation has no messages and was never read, so
   /// [lastActivityAt] is only the epoch-0 placeholder used for sorting.
   bool get hasActivity => previewThreads.isNotEmpty || lastReadAt != null;
+
+  /// Whether the conversation has messages the user has not read yet.
+  bool get isUnread => unreadCount > 0;
 
   DateTime get lastActivityAt {
     if (previewThreads.isNotEmpty) {

@@ -5,6 +5,12 @@ import 'package:zedu/features/features.dart';
 
 import '../../../../../helpers/helpers.dart';
 
+/// Files reads who is signed in to decide Share; nobody is needed here.
+class _SignedOut extends AuthNotifier {
+  @override
+  AuthState build() => const AuthState();
+}
+
 const _feedback = 'Could not open this file. Please try again.';
 const _link = 'https://files.zedu.test/report.pdf';
 const _launcherChannel = MethodChannel('plugins.flutter.io/url_launcher');
@@ -34,7 +40,7 @@ class _Repository implements FilesRepository {
   }) async => const Success(FoldersPage(folders: []));
 
   @override
-  Future<Result<WorkspaceFile>> uploadFile(XFile file) =>
+  Future<Result<WorkspaceFile>> uploadFile(XFile file, {String? parentId}) =>
       throw StateError('Opening a file must not upload it');
 
   @override
@@ -105,6 +111,7 @@ Future<void> _pump(
     ProviderScope(
       overrides: [
         currentOrgIdProvider.overrideWithValue('org-1'),
+        authNotifierProvider.overrideWith(_SignedOut.new),
         userProfileNotifierProvider.overrideWith(_Profile.new),
         filesRepositoryProvider.overrideWithValue(_Repository(link)),
       ],
