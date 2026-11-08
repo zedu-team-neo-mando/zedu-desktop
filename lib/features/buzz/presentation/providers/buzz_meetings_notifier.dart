@@ -9,7 +9,27 @@ class BuzzMeetingsNotifier extends Notifier<BuzzMeetingAction> {
   @override
   BuzzMeetingAction build() => BuzzMeetingAction.none;
 
+  /// Shown when Join has no session to build the link from.
+  static const signInToJoinMessage = 'Sign in again to join a meeting.';
+
+  /// Shown when Join is used while signed in but the workspace slug the
+  /// link needs is missing, e.g. after a restored session.
+  static const workspaceMissingJoinMessage =
+      "Couldn't open this meeting: your workspace isn't loaded. "
+      'Sign out and back in, then try again.';
+
+  /// Shown when a meeting is started with no session.
+  static const signInToStartMessage = 'Sign in again to start a meeting.';
+
+  /// Shown when a meeting is started while signed in but without the
+  /// workspace slug.
+  static const workspaceMissingStartMessage =
+      "Couldn't start a meeting: your workspace isn't loaded. "
+      'Sign out and back in, then try again.';
+
   String get _orgSlug => ref.read(buzzOrgSlugProvider);
+
+  bool get _isSignedIn => ref.read(buzzSignedInProvider);
 
   /// The link to meeting [code], or null when the organisation is unknown.
   Uri? linkFor(String code, {bool directJoin = false}) {
@@ -25,7 +45,8 @@ class BuzzMeetingsNotifier extends Notifier<BuzzMeetingAction> {
 
   /// The page to open for what was typed in Join, or a failure with a message
   /// for the person. A pasted link keeps its own organisation; a bare code
-  /// joins in the current one.
+  /// joins in the current one. "Sign in again" is shown only when there is
+  /// no session; a signed-in person whose workspace isn't loaded is told so.
   Result<Uri> joinLink(String input) {
     if (isBuzzMeetingAddress(input)) {
       final link = buzzMeetingUrlFromLink(
@@ -39,9 +60,14 @@ class BuzzMeetingsNotifier extends Notifier<BuzzMeetingAction> {
           : Success(link);
     }
     final link = linkFor(buzzMeetingCode(input));
-    return link == null
-        ? const Failure(ApiFailure(message: 'Sign in again to join a meeting.'))
-        : Success(link);
+    if (link != null) return Success(link);
+    return Failure(
+      ApiFailure(
+        message: _isSignedIn
+            ? workspaceMissingJoinMessage
+            : signInToJoinMessage,
+      ),
+    );
   }
 
   /// Creates a meeting and returns its link, or a failure with a message
@@ -51,8 +77,12 @@ class BuzzMeetingsNotifier extends Notifier<BuzzMeetingAction> {
       return const Failure(ApiFailure(message: 'Already creating a meeting.'));
     }
     if (_orgSlug.isEmpty) {
-      return const Failure(
-        ApiFailure(message: 'Sign in again to start a meeting.'),
+      return Failure(
+        ApiFailure(
+          message: _isSignedIn
+              ? workspaceMissingStartMessage
+              : signInToStartMessage,
+        ),
       );
     }
     state = startNow

@@ -10,7 +10,13 @@ void main() {
 
   setUp(() {
     mockApi = MockApiBaseService();
-    datasource = ChannelRemoteDataSourceImpl(apiBaseService: mockApi);
+    datasource = ChannelRemoteDataSourceImpl(
+      apiBaseService: mockApi,
+      config: AppConfig(
+        apiBaseUrl: 'https://example.test',
+        usesMockData: false,
+      ),
+    );
   });
 
   void answer(

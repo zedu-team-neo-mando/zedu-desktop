@@ -2,7 +2,10 @@ import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 
 final filesRemoteDataSourceProvider = Provider<FilesRemoteDataSource>(
-  (ref) => FilesRemoteDataSourceImpl(apiBaseService: locator<ApiBaseService>()),
+  (ref) => FilesRemoteDataSourceImpl(
+    apiBaseService: locator<ApiBaseService>(),
+    config: locator<AppConfig>(),
+  ),
 );
 
 final filesRepositoryProvider = Provider<FilesRepository>(

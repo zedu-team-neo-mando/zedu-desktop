@@ -6,17 +6,6 @@ import 'package:zedu/features/features.dart';
 class ChatHistoryNotifier extends ChangeNotifier {
   static const _tag = 'ChatHistoryNotifier';
 
-  /// Returns true when [a] and [b] hold the same JSON values (ignoring key
-  /// order). Used to skip no-op message updates.
-  static bool _sameJsonValue(Map<String, dynamic> a, Map<String, dynamic> b) {
-    if (a.length != b.length) return false;
-    for (final key in a.keys) {
-      if (!b.containsKey(key)) return false;
-      if (a[key] != b[key]) return false;
-    }
-    return true;
-  }
-
   final String channelId;
   final Ref ref;
   late final ComposerFileStore _fileStore;
@@ -285,25 +274,6 @@ class ChatHistoryNotifier extends ChangeNotifier {
     return changed;
   }
 
-  bool _sameJsonValue(Object? a, Object? b) {
-    if (identical(a, b) || a == b) return true;
-    if (a is List && b is List) {
-      return a.length == b.length &&
-          Iterable<int>.generate(
-            a.length,
-          ).every((index) => _sameJsonValue(a[index], b[index]));
-    }
-    if (a is Map && b is Map) {
-      return a.length == b.length &&
-          a.entries.every(
-            (entry) =>
-                b.containsKey(entry.key) &&
-                _sameJsonValue(entry.value, b[entry.key]),
-          );
-    }
-    return false;
-  }
-
   /// Whether [messageId] is being sent right now.
   bool isSending(String messageId) => _sendsInFlight.contains(messageId);
 
@@ -447,6 +417,26 @@ class ChatHistoryNotifier extends ChangeNotifier {
       await loadMore();
       if (_isDisposed || page == before) return; // closed, or the page failed
     }
+  }
+
+  /// Loads older pages until the message [messageId] is loaded, so a search
+  /// hit far back in the history can be shown. Returns whether it is loaded.
+  /// Stops at the end of the history, when a page fails, after [maxPages]
+  /// pages, or once this notifier is disposed.
+  Future<bool> loadUntilMessage(String messageId, {int maxPages = 50}) async {
+    bool isLoaded() => messages.any((m) => m['id']?.toString() == messageId);
+
+    for (var i = 0; i < maxPages && !isLoaded() && hasMore; i++) {
+      while (isLoading) {
+        if (_isDisposed) return false;
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+      if (_isDisposed || !hasMore) break;
+      final before = page;
+      await loadMore();
+      if (_isDisposed || page == before) return false;
+    }
+    return !_isDisposed && isLoaded();
   }
 
   // What each message was sent with, so a retry sends it the same way.

@@ -26,6 +26,13 @@ class _FakeDmListNotifier extends DmListNotifier {
   Future<List<DmConversation>> build() async => conversations;
 }
 
+class _FakeWorkspaceNotifier extends WorkspaceNotifier {
+  @override
+  WorkspaceState build() => const WorkspaceState(
+    selectedWorkspace: Workspace(id: 'org-1', name: 'Org 1', avatar: ''),
+  );
+}
+
 GoRouter _buildRouter() => GoRouter(
   initialLocation: AppRouter.login,
   navigatorKey: AppRouter.navigatorKey,
@@ -69,6 +76,7 @@ void main() {
         ProviderScope(
           overrides: [
             authNotifierProvider.overrideWith(() => authNotifier),
+            workspaceProvider.overrideWith(_FakeWorkspaceNotifier.new),
             dmListProvider.overrideWith(
               () => _FakeDmListNotifier(conversations),
             ),

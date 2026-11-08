@@ -157,6 +157,15 @@ void main() {
       },
     ]);
 
+    // The menu button stays hidden on incoming messages until hovered.
+    final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await gesture.addPointer(location: Offset.zero);
+    addTearDown(gesture.removePointer);
+    await gesture.moveTo(
+      tester.getCenter(find.text('their message', findRichText: true)),
+    );
+    await tester.pumpAndSettle();
+
     await tester.tap(find.byTooltip('Message actions'));
     await tester.pumpAndSettle();
 

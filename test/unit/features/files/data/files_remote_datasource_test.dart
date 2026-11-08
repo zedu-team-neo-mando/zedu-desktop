@@ -19,7 +19,29 @@ void main() {
     downloadClient = MockDio();
     datasource = FilesRemoteDataSourceImpl(
       apiBaseService: api,
+      config: AppConfig(
+        apiBaseUrl: 'https://example.test',
+        usesMockData: false,
+      ),
       downloadClient: downloadClient,
+    );
+  });
+
+  test('mock build lists no files and makes no request (#3474)', () async {
+    final mockDatasource = FilesRemoteDataSourceImpl(
+      apiBaseService: api,
+      config: AppConfig(apiBaseUrl: 'https://example.test', usesMockData: true),
+      downloadClient: downloadClient,
+    );
+
+    final page = await mockDatasource.fetchFiles(const FilesQuery());
+
+    expect(page.files, isEmpty);
+    verifyNever(
+      () => api.get<Map<String, dynamic>>(
+        path: any(named: 'path'),
+        queryParameters: any(named: 'queryParameters'),
+      ),
     );
   });
 

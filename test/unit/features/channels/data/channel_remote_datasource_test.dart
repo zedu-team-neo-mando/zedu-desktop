@@ -11,7 +11,13 @@ void main() {
 
     setUp(() {
       mockApi = MockApiBaseService();
-      datasource = ChannelRemoteDataSourceImpl(apiBaseService: mockApi);
+      datasource = ChannelRemoteDataSourceImpl(
+        apiBaseService: mockApi,
+        config: AppConfig(
+          apiBaseUrl: 'https://example.test',
+          usesMockData: false,
+        ),
+      );
     });
 
     void stubResponse(Map<String, dynamic> body) {
@@ -85,7 +91,13 @@ void main() {
 
     setUp(() {
       mockApi = MockApiBaseService();
-      datasource = ChannelRemoteDataSourceImpl(apiBaseService: mockApi);
+      datasource = ChannelRemoteDataSourceImpl(
+        apiBaseService: mockApi,
+        config: AppConfig(
+          apiBaseUrl: 'https://example.test',
+          usesMockData: false,
+        ),
+      );
     });
 
     void stubPatch(Map<String, dynamic> body) {
@@ -142,7 +154,13 @@ void main() {
 
     setUp(() {
       mockApi = MockApiBaseService();
-      datasource = ChannelRemoteDataSourceImpl(apiBaseService: mockApi);
+      datasource = ChannelRemoteDataSourceImpl(
+        apiBaseService: mockApi,
+        config: AppConfig(
+          apiBaseUrl: 'https://example.test',
+          usesMockData: false,
+        ),
+      );
       // fetchChannels also merges unread counts from user-channels.
       when(
         () => mockApi.get<Map<String, dynamic>>(
@@ -252,6 +270,45 @@ void main() {
       expect(
         result.length,
         pageSize * ChannelRemoteDataSourceImpl.maxChannelPages,
+      );
+    });
+  });
+
+  group('ChannelRemoteDataSourceImpl in the mock build (#3474)', () {
+    late MockApiBaseService mockApi;
+    late ChannelRemoteDataSourceImpl datasource;
+
+    setUp(() {
+      mockApi = MockApiBaseService();
+      datasource = ChannelRemoteDataSourceImpl(
+        apiBaseService: mockApi,
+        config: AppConfig(
+          apiBaseUrl: 'https://example.test',
+          usesMockData: true,
+        ),
+      );
+    });
+
+    test('lists no channels and sends no request', () async {
+      expect(await datasource.fetchChannels('org-1'), isEmpty);
+      verifyNever(
+        () => mockApi.get<Map<String, dynamic>>(
+          path: any(named: 'path'),
+          queryParameters: any(named: 'queryParameters'),
+        ),
+      );
+    });
+
+    test('refuses a write without sending a request', () async {
+      await expectLater(
+        datasource.joinChannel('ch-1'),
+        throwsA(isA<ApiFailure>()),
+      );
+      verifyNever(
+        () => mockApi.post<Map<String, dynamic>>(
+          path: any(named: 'path'),
+          data: any(named: 'data'),
+        ),
       );
     });
   });

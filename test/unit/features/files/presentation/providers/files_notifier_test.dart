@@ -69,6 +69,60 @@ void main() {
     expect(state().query.search, 'logo');
   });
 
+  group('Reset filters (Ziki #3445)', () {
+    test('clears search, type and date together, keeping the rest', () {
+      notifier()
+        ..selectView(FilesScope.mine)
+        ..openFolder(const FileFolder(id: 'f1', name: 'Reports'))
+        ..setTab(FilesTab.files)
+        ..setSort(FilesSort.oldestFirst)
+        ..setCategory(FileCategory.images)
+        ..setDateModified(DateModifiedFilter.today)
+        ..setSearch('logo')
+        ..setPage(3);
+      expect(state().hasFilters, isTrue);
+
+      notifier().resetFilters();
+
+      expect(state().category, isNull);
+      expect(state().dateModified, isNull);
+      expect(state().search, '');
+      expect(state().hasFilters, isFalse);
+      expect(state().page, 1);
+      expect(state().view, FilesScope.mine);
+      expect(state().folderId, 'f1');
+      expect(state().tab, FilesTab.files);
+      expect(state().sort, FilesSort.oldestFirst);
+    });
+
+    test('changes state once, so the list refreshes once', () {
+      notifier()
+        ..setCategory(FileCategory.images)
+        ..setSearch('logo');
+      var changes = 0;
+      final sub = container.listen(filesProvider, (_, _) => changes++);
+      addTearDown(sub.close);
+
+      notifier().resetFilters();
+
+      expect(changes, 1);
+    });
+
+    test('does nothing when no filter is set', () {
+      final before = state();
+
+      notifier().resetFilters();
+
+      expect(identical(state(), before), isTrue);
+    });
+
+    test('a search of only spaces is not a filter', () {
+      notifier().setSearch('   ');
+
+      expect(state().hasFilters, isFalse);
+    });
+  });
+
   test('sorting goes back to the first page without changing the request', () {
     notifier().setPage(2);
     final before = state().query;
@@ -108,6 +162,36 @@ void main() {
 
       expect(repository.pages, [2]);
       expect(page.currentPage, 2);
+    });
+
+    test('Name (A–Z) reads the page the user asked for (Ziki #3449)', () async {
+      repository.totalPages = 3;
+      filesNotifier().setSort(FilesSort.nameAz);
+      filesNotifier().setPage(2);
+      final page = await files.read(filesListProvider.future);
+
+      expect(repository.pages, [2]);
+      expect(page.currentPage, 2);
+    });
+
+    test('choosing Name (A–Z) keeps the filters, folder and tab', () {
+      filesNotifier()
+        ..openFolder(const FileFolder(id: 'f1', name: 'Reports'))
+        ..setCategory(FileCategory.documents)
+        ..setDateModified(DateModifiedFilter.last7Days)
+        ..setSearch('plan');
+      final before = files.read(filesProvider);
+
+      filesNotifier().setSort(FilesSort.nameAz);
+      final after = files.read(filesProvider);
+
+      expect(after.sort, FilesSort.nameAz);
+      expect(after.folderId, before.folderId);
+      expect(after.category, FileCategory.documents);
+      expect(after.dateModified, DateModifiedFilter.last7Days);
+      expect(after.search, 'plan');
+      expect(after.tab, before.tab);
+      expect(after.view, before.view);
     });
 
     test('oldest first reads the server pages backwards', () async {

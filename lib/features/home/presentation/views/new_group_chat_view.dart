@@ -15,6 +15,10 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
   bool _isLoading = false;
   String? _errorMessage;
 
+  /// Set once the person changes the selection, so the helper stays neutral
+  /// until then and only turns red for an incomplete selection afterwards.
+  bool _touched = false;
+
   // Filtered members list
   List<TeamMember> _filteredMembers = [];
   bool _showDropdown = false;
@@ -75,6 +79,7 @@ class _NewGroupChatViewState extends ConsumerState<NewGroupChatView> {
 
   void _toggleMemberSelection(TeamMember member) {
     setState(() {
+      _touched = true;
       if (_selectedMembers.any((m) => m.id == member.id)) {
         _selectedMembers.removeWhere((m) => m.id == member.id);
       } else {

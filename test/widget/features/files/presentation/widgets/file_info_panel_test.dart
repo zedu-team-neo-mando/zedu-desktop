@@ -79,6 +79,49 @@ void main() {
       expect(find.byType(Image), findsNothing);
     });
   }
+
+  testWidgets('copy button copies file name to clipboard and shows toast', (
+    tester,
+  ) async {
+    const file = WorkspaceFile(
+      id: 'copy-test',
+      name: 'quarterly_results.xlsx',
+      fileType: 'xlsx',
+    );
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+
+    await showFile(tester, file);
+    await tester.pumpAndSettle();
+
+    expect(find.text('quarterly_results.xlsx'), findsOneWidget);
+    final copyBtn = find.byTooltip('Copy file name');
+    expect(copyBtn, findsOneWidget);
+
+    await tester.tap(copyBtn);
+    await tester.pumpAndSettle();
+
+    expect(copied, 'quarterly_results.xlsx');
+    expect(find.text('File name copied'), findsOneWidget);
+
+    // Let the toast's auto-dismiss timer fire so no timers are left pending.
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+  });
 }
 
 final _svgBytes = utf8.encode(

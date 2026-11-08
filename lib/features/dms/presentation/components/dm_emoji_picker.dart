@@ -1,6 +1,7 @@
 import 'package:zedu/core/core.dart';
+import 'package:zedu/features/features.dart';
 
-class DmEmojiPicker extends StatefulWidget {
+class DmEmojiPicker extends ConsumerStatefulWidget {
   final ValueChanged<String> onEmojiSelected;
   final VoidCallback onClose;
 
@@ -11,10 +12,10 @@ class DmEmojiPicker extends StatefulWidget {
   });
 
   @override
-  State<DmEmojiPicker> createState() => _DmEmojiPickerState();
+  ConsumerState<DmEmojiPicker> createState() => _DmEmojiPickerState();
 }
 
-class _DmEmojiPickerState extends State<DmEmojiPicker> {
+class _DmEmojiPickerState extends ConsumerState<DmEmojiPicker> {
   final _focusNode = FocusNode();
   final _scrollController = ScrollController();
   int _selectedIndex = 0;
@@ -27,6 +28,12 @@ class _DmEmojiPickerState extends State<DmEmojiPicker> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
     });
+  }
+
+  /// Remembers [emoji] for the Recently used row, then reports it.
+  void _select(String emoji) {
+    ref.read(recentEmojisProvider.notifier).add(emoji);
+    widget.onEmojiSelected(emoji);
   }
 
   @override
@@ -47,7 +54,7 @@ class _DmEmojiPickerState extends State<DmEmojiPicker> {
     if (key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.numpadEnter ||
         key == LogicalKeyboardKey.space) {
-      widget.onEmojiSelected(_emojis[_selectedIndex]);
+      _select(_emojis[_selectedIndex]);
       return KeyEventResult.handled;
     }
 
@@ -171,6 +178,7 @@ class _DmEmojiPickerState extends State<DmEmojiPicker> {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final recent = ref.watch(recentEmojisProvider);
 
     return Focus(
       focusNode: _focusNode,
@@ -221,6 +229,10 @@ class _DmEmojiPickerState extends State<DmEmojiPicker> {
               ),
             ),
             Divider(height: 1, color: colors.divider),
+            if (recent.isNotEmpty) ...[
+              _RecentEmojiRow(emojis: recent, onSelected: _select),
+              Divider(height: 1, color: colors.divider),
+            ],
             Flexible(
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -243,9 +255,9 @@ class _DmEmojiPickerState extends State<DmEmojiPicker> {
                         button: true,
                         selected: isSelected,
                         excludeSemantics: true,
-                        onTap: () => widget.onEmojiSelected(_emojis[index]),
+                        onTap: () => _select(_emojis[index]),
                         child: InkWell(
-                          onTap: () => widget.onEmojiSelected(_emojis[index]),
+                          onTap: () => _select(_emojis[index]),
                           canRequestFocus: false,
                           borderRadius: BorderRadius.circular(6),
                           hoverColor: colors.onPrimary.withValues(alpha: 0.08),
@@ -272,6 +284,76 @@ class _DmEmojiPickerState extends State<DmEmojiPicker> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The emojis picked most recently this session, newest first (Ziki #3433).
+class _RecentEmojiRow extends StatelessWidget {
+  const _RecentEmojiRow({required this.emojis, required this.onSelected});
+
+  final List<String> emojis;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 4),
+            child: Text(
+              'Recently used',
+              style: TextStyle(
+                color: colors.textHint,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              for (final emoji in emojis)
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Tooltip(
+                    message: 'Recently used $emoji',
+                    excludeFromSemantics: true,
+                    child: Semantics(
+                      // Its own node, so it isn't merged into the picker's.
+                      container: true,
+                      label: 'Recently used $emoji',
+                      button: true,
+                      excludeSemantics: true,
+                      onTap: () => onSelected(emoji),
+                      child: InkWell(
+                        key: ValueKey('recent-emoji-$emoji'),
+                        onTap: () => onSelected(emoji),
+                        canRequestFocus: false,
+                        borderRadius: BorderRadius.circular(6),
+                        hoverColor: colors.onPrimary.withValues(alpha: 0.08),
+                        child: SizedBox(
+                          width: 36,
+                          height: 36,
+                          child: Center(
+                            child: Text(
+                              emoji,
+                              style: const TextStyle(fontSize: 20),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }

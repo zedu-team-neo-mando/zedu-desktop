@@ -38,7 +38,12 @@ class FilesNotifier extends Notifier<FilesState> {
 
   /// Shows [view] while keeping the open folder, so uploads stay visible.
   void switchViewKeepingFolder(FilesScope view) {
-    state = _with(view: view, folderPath: state.folderPath, page: 1, folderPage: 1);
+    state = _with(
+      view: view,
+      folderPath: state.folderPath,
+      page: 1,
+      folderPage: 1,
+    );
   }
 
   /// Opens [folder] inside the current one and shows its files.
@@ -72,6 +77,18 @@ class FilesNotifier extends Notifier<FilesState> {
   void setSearch(String search) {
     if (search.trim() == state.search.trim()) return;
     state = _with(search: search, page: 1);
+  }
+
+  /// Clears the name search, file type and date-modified filters in one
+  /// refresh, keeping the folder, list, tab and sort (Ziki #3445).
+  void resetFilters() {
+    if (!state.hasFilters) return;
+    state = _with(
+      category: () => null,
+      dateModified: () => null,
+      search: '',
+      page: 1,
+    );
   }
 
   void setSort(FilesSort sort) {
@@ -111,7 +128,9 @@ class FilesListNotifier extends AsyncNotifier<FilesPage> {
     final query = ref.watch(filesProvider.select((s) => s.query));
     final repository = ref.read(filesRepositoryProvider);
 
-    if (query.sort == FilesSort.newestFirst) {
+    // Only oldest-first reads the pages backwards; name order sorts each
+    // page as the server sends it (Ziki #3449).
+    if (query.sort != FilesSort.oldestFirst) {
       _seedQuery = null;
       _serverPages = null;
       return _fetch(repository, query);
