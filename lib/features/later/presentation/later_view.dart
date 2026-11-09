@@ -31,7 +31,7 @@ class LaterBody extends ConsumerStatefulWidget {
 
 class _LaterBodyState extends ConsumerState<LaterBody> {
   final _pending = <String>{};
-  Future<void> _remove(SavedMessage item) async {
+  Future<void> _remove(LaterMessage item) async {
     final org = ref.read(workspaceProvider).selectedWorkspace?.id;
     if (org == null || !_pending.add(item.id)) return;
     setState(() {});
@@ -113,7 +113,7 @@ class _LaterBodyState extends ConsumerState<LaterBody> {
                                     ? 'Original conversation unavailable. You can remove this saved item.'
                                     : item.preview.isEmpty
                                     ? 'Open to view the original message'
-                                    : item.preview,
+                                    : threadText(item.preview),
                               ].join(' · '),
                               maxLines: 3,
                               overflow: TextOverflow.ellipsis,
@@ -149,7 +149,7 @@ class _LaterBodyState extends ConsumerState<LaterBody> {
 
 class _SavedMessageDialog extends ConsumerStatefulWidget {
   const _SavedMessageDialog({required this.item, required this.orgId});
-  final SavedMessage item;
+  final LaterMessage item;
   final String orgId;
   @override
   ConsumerState<_SavedMessageDialog> createState() =>
@@ -223,8 +223,10 @@ class _SavedMessageDialogState extends ConsumerState<_SavedMessageDialog> {
                   }
                   return SingleChildScrollView(
                     child: SelectableText(
-                      (message['message'] ?? message['content'] ?? '')
-                          .toString(),
+                      threadText(
+                        (message['message'] ?? message['content'] ?? '')
+                            .toString(),
+                      ),
                     ),
                   );
                 },

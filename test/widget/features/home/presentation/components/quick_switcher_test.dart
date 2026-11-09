@@ -1,5 +1,6 @@
 import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
+
 import '../../../../../helpers/helpers.dart';
 
 DmConversation _dm(String username) => DmConversation(
@@ -45,6 +46,38 @@ void main() {
       expect(labels, ['design', 'web-design']);
     });
 
+    test('hides actions until something is typed', () {
+      final all = [...entries, ...quickSwitcherActions];
+
+      expect(filterQuickSwitcherEntries(all, ''), entries);
+      expect(filterQuickSwitcherEntries(all, 'open').map((e) => e.label), [
+        'Open Settings',
+      ]);
+    });
+
+    test('matches actions by name too', () {
+      final labels = filterQuickSwitcherEntries([
+        ...entries,
+        ...quickSwitcherActions,
+      ], 'sett').map((e) => e.label);
+
+      expect(labels, ['Open Settings']);
+    });
+
+    test('matches channels and DMs when query has leading # or @', () {
+      final channelLabels = filterQuickSwitcherEntries(
+        entries,
+        '#gen',
+      ).map((e) => e.label);
+      final dmLabels = filterQuickSwitcherEntries(
+        entries,
+        '@gid',
+      ).map((e) => e.label);
+
+      expect(channelLabels, ['general']);
+      expect(dmLabels, ['Gideon']);
+    });
+
     test('returns nothing when no name matches', () {
       expect(filterQuickSwitcherEntries(entries, 'zzz'), isEmpty);
     });
@@ -82,6 +115,19 @@ void main() {
 
       expect(find.text('Gideon'), findsOneWidget);
       expect(find.text('general'), findsNothing);
+      expect(find.text('design'), findsNothing);
+    });
+
+    testWidgets('typing # before a channel name filters the list', (
+      tester,
+    ) async {
+      await pumpDialog(tester);
+
+      await tester.enterText(find.byType(TextField), '#gen');
+      await tester.pump();
+
+      expect(find.text('general'), findsOneWidget);
+      expect(find.text('Gideon'), findsNothing);
       expect(find.text('design'), findsNothing);
     });
 
@@ -123,6 +169,30 @@ void main() {
       await tester.pump();
 
       expect(selected.single.conversation?.username, 'Gideon');
+    });
+
+    testWidgets('typing finds an action and Enter reports it', (tester) async {
+      final selected = <QuickSwitcherEntry>[];
+      await tester.pumpWidget(
+        buildTestMaterialApp(
+          Scaffold(
+            body: QuickSwitcherDialog(
+              entries: [...entries, ...quickSwitcherActions],
+              onSelected: selected.add,
+            ),
+          ),
+        ),
+      );
+
+      await tester.enterText(find.byType(TextField), 'sett');
+      await tester.pump();
+      expect(find.text('Open Settings'), findsOneWidget);
+      expect(find.text('general'), findsNothing);
+
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+
+      expect(selected.single.action, QuickSwitcherAction.openSettings);
     });
 
     group('with more rows than fit', () {
